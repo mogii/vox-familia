@@ -29,7 +29,7 @@ graph TD
         A[User Speaks] -->|Hardware: Mic| B(Audio Stream)
     end
 
-    subgraph Host Application (Mac / Raspberry Pi)
+    subgraph Host Application (Mac or Raspberry Pi)
         B --> C{Speech-to-Text API<br>(OpenAI Whisper)}
         C -->|User Text| D(Core Logic)
         D -->|User Query & Profile| E[Knowledge Base (RAG)<br>- Static: Books, Movies<br>- Dynamic: Memory Log]
