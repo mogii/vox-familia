@@ -25,24 +25,24 @@
 
 ```mermaid
 graph TD
-    subgraph User Interaction
+    subgraph "User Interaction"
         A[User Speaks] -->|Hardware: Mic| B(Audio Stream)
     end
 
-    subgraph Host Application (Mac or Raspberry Pi)
-        B --> C{Speech-to-Text API<br>(OpenAI Whisper)}
+    subgraph "Host Application (Mac / Raspberry Pi)"
+        B --> C{"Speech-to-Text API (OpenAI Whisper)"}
         C -->|User Text| D(Core Logic)
-        D -->|User Query & Profile| E[Knowledge Base (RAG)<br>- Static: Books, Movies<br>- Dynamic: Memory Log]
+        D -->|User Query & Profile| E["Knowledge Base (RAG)<br>- Static: Books, Movies<br>- Dynamic: Memory Log"]
         E -->|Relevant Context| D
-        subgraph Gemini API Call
-            D --> F[LLM Prompt<br>- System Prompt (by Profile)<br>- Chat History<br>- User Query<br>- RAG Context]
+        subgraph "Gemini API Call"
+            D --> F["LLM Prompt<br>- System Prompt (by Profile)<br>- Chat History<br>- User Query<br>- RAG Context"]
             F --> G(AI Response Text)
         end
         G --> H{Text-to-Speech API}
         H -->|Response Audio| I(Audio Output)
     end
 
-    subgraph User Interaction
+    subgraph "User Interaction"
         I -->|Hardware: Speaker| J[User Hears Response]
     end
 ```
