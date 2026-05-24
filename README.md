@@ -1,117 +1,69 @@
-# vox-familia
+# 宝宝闲置小铺（微信小程序）
 
-> *The Voice of the Family. A personalized AI companion for my loved ones.*
+一个用来在微信群里卖宝宝闲置用品的微信小程序，基于**微信云开发**，不需要自己买服务器。
 
-[](https://opensource.org/licenses/MIT)
+## 功能
 
-## About The Project
+- **逛闲置**：首页瀑布流展示在售商品，下拉刷新、上拉加载更多。
+- **商品详情**：多图轮播、价格、成色、描述、卖家联系方式（一键复制）。
+- **发布闲置**：拍照/相册选图（最多 9 张）、填写标题/价格/成色/描述/联系方式，一键发布。
+- **标记已售出**：卖掉的东西标成「已售出」，首页自动不再展示；也可以恢复在售或删除。
+- **分享到微信群**：商品详情页和首页都能转发给好友或微信群。
 
-`vox-familia` 是一个充满个人情感的AI项目，旨在为我的家庭成员——我的孩子、我的父母，我自己——创建一个无屏幕、纯语音的AI互动伴侣。
+> 说明：微信支付需要企业资质，个人号开不了。所以这里不做线上收银，而是「买家看中后照着联系方式加你微信、直接转账」，这也是群里卖闲置最常见的方式。
 
-传统的智能助手功能强大，但缺乏个性与记忆。本项目的核心是构建一个**多用户画像（Multi-Profile）系统**，让AI能够以不同的身份、性格和知识储备与特定家庭成员交流。它不仅能回答问题，更能“记住”每个人的喜好，了解我儿子最爱的绘本，熟悉我父母感兴趣的话题，成为一个真正懂我们的家庭成员。
+## 项目结构
 
-## Core Features
-
-  * **👥 多用户画像系统 (Multi-Profile System)**: 可轻松切换用户身份（如`son`, `parent`, `default`），每个身份拥有独立的性格、知识库和记忆。
-  * **🧠 个性化知识库 (Personalized Knowledge Base)**: 基于**检索增强生成 (RAG)** 技术，AI能够深入理解并回答关于特定绘本、动画或家庭事件的提问。
-  * **🗣️ 动态长期记忆 (Dynamic Long-Term Memory)**: AI能从对话中学习和提取关键信息（如“我今天最喜欢的故事是小熊的冒险”），并将其存入长期记忆，让未来的对话更具情境感知能力。
-  * **🎙️ 纯语音交互 (Voice-First Interface)**: 支持“按键通话 (Push-to-Talk)”或“唤醒词”模式，实现自然、无屏幕的交流体验。
-  * **☁️ API驱动**: 核心AI能力由强大的大语言模型（如 Google Gemini）和语音模型（如 OpenAI Whisper）驱动。
-  * \*\* portability 灵活的硬件部署\*\*: 项目设计支持多种硬件方案，从简单的Mac + 蓝牙耳机，到独立的树莓派，再到定制的ESP32无线终端。
-
-## Architecture
-
-项目采用模块化设计，将语音I/O与AI核心逻辑分离。
-
-```mermaid
-graph TD
-    subgraph "User Interaction"
-        A[User Speaks] -->|Hardware: Mic| B(Audio Stream)
-    end
-
-    subgraph "Host Application (Mac / Raspberry Pi)"
-        B --> C{"Speech-to-Text API (OpenAI Whisper)"}
-        C -->|User Text| D(Core Logic)
-        D -->|User Query & Profile| E["Knowledge Base (RAG)<br>- Static: Books, Movies<br>- Dynamic: Memory Log"]
-        E -->|Relevant Context| D
-        subgraph "Gemini API Call"
-            D --> F["LLM Prompt<br>- System Prompt (by Profile)<br>- Chat History<br>- User Query<br>- RAG Context"]
-            F --> G(AI Response Text)
-        end
-        G --> H{Text-to-Speech API}
-        H -->|Response Audio| I(Audio Output)
-    end
-
-    subgraph "User Interaction"
-        I -->|Hardware: Speaker| J[User Hears Response]
-    end
+```
+.
+├── miniprogram/                 小程序前端
+│   ├── app.js / app.json / app.wxss
+│   ├── config.js                ← 在这里填你的云环境 ID
+│   ├── sitemap.json
+│   └── pages/
+│       ├── index/               逛闲置（首页）
+│       ├── detail/              商品详情
+│       ├── publish/             发布闲置
+│       └── mine/                我的闲置（管理：售出/恢复/删除）
+├── cloudfunctions/
+│   └── login/                   云函数：返回当前用户 openid
+└── project.config.json          ← 在这里填你的小程序 AppID
 ```
 
-## Technology Stack
+## 第一次跑起来（按顺序操作）
 
-  * **Language**: Python 3.9+
-  * **LLM**: Google Gemini API
-  * **Speech-to-Text**: OpenAI Whisper API
-  * **Text-to-Speech**: OpenAI TTS API (or other provider)
-  * **Vector Database (for RAG)**: ChromaDB (local) or Pinecone (cloud)
-  * **Hardware Prototypes**:
-      * macOS + Bluetooth Headset
-      * Raspberry Pi 4B + USB Mic/Speaker
-      * ESP32 (as a wireless audio satellite)
+### 1. 申请小程序并安装工具
+1. 在 [微信公众平台](https://mp.weixin.qq.com) 注册一个小程序账号，拿到 **AppID**（个人主体即可）。
+2. 下载并安装 [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)。
 
-## Getting Started
+### 2. 导入项目
+1. 打开微信开发者工具 → 「导入项目」→ 选择本仓库根目录。
+2. 把 `project.config.json` 里的 `"appid": "REPLACE_WITH_YOUR_APPID"` 改成你自己的 AppID
+   （也可以在导入时直接填）。
 
-要启动并运行此项目，请按以下步骤操作。
+### 3. 开通云开发
+1. 在开发者工具顶部点击 **「云开发」** 按钮，按提示开通（个人账号有免费额度）。
+2. 创建一个环境，复制它的**环境 ID**（形如 `baby-resale-2xxxxx`）。
+3. 打开 `miniprogram/config.js`，把 `REPLACE_WITH_YOUR_CLOUD_ENV_ID` 改成你的环境 ID。
 
-### Prerequisites
+### 4. 创建数据库集合
+1. 进入「云开发控制台 → 数据库」，新建一个集合，名字必须是 **`products`**。
+2. 点这个集合的「权限设置」，选择 **「所有用户可读，仅创建者可读写」**。
+   （这样所有人都能逛，但只有发布者本人能改/删自己的商品。）
 
-  * Python 3.9 or higher
-  * Google AI API Key
-  * OpenAI API Key
+### 5. 部署云函数
+1. 在开发者工具左侧文件树里，右键 `cloudfunctions/login` 文件夹。
+2. 选择 **「上传并部署：云端安装依赖」**，等待部署完成。
 
-### Installation
+### 6. 预览
+点击工具栏的「编译」即可在模拟器里试用；点「预览」用手机扫码在真机体验。
 
-1.  **克隆仓库**
-    ```sh
-    git clone https://github.com/your_username/vox-familia.git
-    cd vox-familia
-    ```
-2.  **创建并激活虚拟环境**
-    ```sh
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-3.  **安装依赖**
-    ```sh
-    pip install -r requirements.txt
-    ```
-4.  **配置环境变量**
-      * 将 `.env.example` 文件复制为 `.env`
-      * 在 `.env` 文件中填入您的API密钥。
-    <!-- end list -->
-    ```.env
-    GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
-    OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
-    ```
+## 常见问题
 
-### Running the Application
+- **首页一直「加载失败」**：多半是 `config.js` 的环境 ID 没填对，或 `products` 集合还没建。
+- **能逛但发布失败**：检查 `products` 集合权限是否为「所有用户可读，仅创建者可读写」。
+- **详情页看不到「标记已售/删除」按钮**：那些按钮只对商品的发布者本人显示；确认 `login` 云函数已部署成功。
 
-```sh
-python main.py --profile son
-```
+## 上线
 
-## Roadmap
-
-  * [x] **Phase 1 - MVP**: 在macOS上使用蓝牙耳机作为I/O设备，实现核心对话逻辑。
-  * [ ] **Phase 2 - Dedicated Device**: 将应用迁移到带有UPS HAT的树莓派上，实现稳定可靠的独立运行。
-  * [ ] **Phase 3 - Custom Hardware**: 开发基于ESP32的无线音频终端，打造终极的定制硬件形态。
-  * [ ] **Future - Local Models**: 探索使用本地化的STT/TTS模型，以增强隐私并实现离线功能。
-
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
-
-## Acknowledgments
-
-  * A big thank you to the teams behind Google Gemini and OpenAI.
-  * To my family, for being the inspiration for this project.
+测试没问题后，在开发者工具点「上传」提交版本，再到微信公众平台「版本管理」里提交审核、发布即可。

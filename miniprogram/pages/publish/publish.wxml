@@ -1,0 +1,78 @@
+<view class="publish">
+  <view class="section">
+    <view class="sec-title">商品照片（最多 9 张）</view>
+    <view class="img-grid">
+      <view class="img-item" wx:for="{{images}}" wx:key="*this">
+        <image class="thumb" src="{{item}}" mode="aspectFill"></image>
+        <view class="img-del" data-index="{{index}}" bindtap="removeImage">×</view>
+      </view>
+      <view wx:if="{{images.length < 9}}" class="img-add" bindtap="chooseImage">
+        <text class="add-plus">＋</text>
+        <text class="add-text">添加照片</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="field">
+      <text class="label">标题</text>
+      <input
+        class="input"
+        placeholder="例如：婴儿推车 九成新"
+        data-field="title"
+        value="{{title}}"
+        bindinput="onInput"
+        maxlength="40"
+      />
+    </view>
+    <view class="field">
+      <text class="label">价格</text>
+      <input
+        class="input"
+        type="digit"
+        placeholder="0"
+        data-field="price"
+        value="{{price}}"
+        bindinput="onInput"
+      />
+      <text class="unit">元</text>
+    </view>
+    <view class="field">
+      <text class="label">成色</text>
+      <picker
+        class="picker-wrap"
+        mode="selector"
+        range="{{conditions}}"
+        value="{{conditionIndex}}"
+        bindchange="onConditionChange"
+      >
+        <view class="picker">{{conditions[conditionIndex]}} ›</view>
+      </picker>
+    </view>
+    <view class="field">
+      <text class="label">联系方式</text>
+      <input
+        class="input"
+        placeholder="微信号 / 群里@我 等"
+        data-field="contact"
+        value="{{contact}}"
+        bindinput="onInput"
+        maxlength="40"
+      />
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="sec-title">描述</view>
+    <textarea
+      class="textarea"
+      placeholder="说说宝贝的新旧程度、购买时间、转手原因等"
+      data-field="desc"
+      value="{{desc}}"
+      bindinput="onInput"
+      maxlength="500"
+    />
+  </view>
+
+  <button class="submit" bindtap="submit" disabled="{{submitting}}">发布</button>
+</view>

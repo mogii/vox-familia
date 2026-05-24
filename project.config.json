@@ -1,0 +1,16 @@
+{
+  "appid": "REPLACE_WITH_YOUR_APPID",
+  "projectname": "baby-resale",
+  "compileType": "miniprogram",
+  "libVersion": "latest",
+  "miniprogramRoot": "miniprogram/",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "nodeModules": true
+  }
+}

@@ -1,0 +1,24 @@
+page {
+  background: #f5f6f8;
+  color: #222;
+  font-size: 28rpx;
+}
+
+view,
+text,
+input,
+textarea {
+  box-sizing: border-box;
+}
+
+button::after {
+  border: none;
+}
+
+.loading,
+.nomore {
+  text-align: center;
+  color: #999;
+  font-size: 26rpx;
+  padding: 30rpx 0;
+}
