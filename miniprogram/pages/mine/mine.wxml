@@ -1,11 +1,13 @@
 <view class="mine">
-  <view wx:if="{{products.length === 0 && !loading}}" class="empty">
+  <view wx:if="{{!isOwner}}" class="guest-tip">这里是卖家管理页，逛闲置请看「逛闲置」标签~</view>
+
+  <view wx:if="{{isOwner && products.length === 0 && !loading}}" class="empty">
     <text class="empty-emoji">📦</text>
-    <text class="empty-text">你还没有发布闲置</text>
-    <button class="btn-go-publish" bindtap="goPublish">去发布</button>
+    <text class="empty-text">还没有商品</text>
+    <text class="empty-sub">在电脑上用脚本处理视频并发布后，这里就会出现</text>
   </view>
 
-  <view class="list">
+  <view wx:if="{{isOwner}}" class="list">
     <view class="row" wx:for="{{products}}" wx:key="_id">
       <image
         class="row-img"
@@ -16,7 +18,7 @@
       ></image>
       <view class="row-main" data-id="{{item._id}}" bindtap="goDetail">
         <view class="row-title">{{item.title}}</view>
-        <view class="row-price">¥{{item.price}}<text class="row-cond">{{item.condition}}</text></view>
+        <view class="row-price">${{item.price}}<text class="row-cond">{{item.condition}}</text></view>
         <view class="row-status {{item.status === 'sold' ? 'sold' : 'on'}}">
           {{item.status === 'sold' ? '已售出' : '在售中'}}
         </view>
@@ -46,6 +48,4 @@
       </view>
     </view>
   </view>
-
-  <view wx:if="{{products.length > 0}}" class="float-publish" bindtap="goPublish">＋ 发布新闲置</view>
 </view>

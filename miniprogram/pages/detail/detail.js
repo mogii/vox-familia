@@ -1,4 +1,5 @@
 const app = getApp()
+const config = require('../../config')
 const db = wx.cloud.database()
 
 Page({
@@ -25,7 +26,7 @@ Page({
         const product = res.data
         this.setData({
           product,
-          isOwner: product._openid === app.globalData.openid,
+          isOwner: !!app.globalData.openid && app.globalData.openid === config.ownerOpenid,
           loading: false
         })
       })
@@ -121,7 +122,7 @@ Page({
   onShareAppMessage() {
     const p = this.data.product || {}
     return {
-      title: p.title ? `${p.title}  ¥${p.price}` : '宝宝闲置好物',
+      title: p.title ? `${p.title}  $${p.price}` : '宝宝闲置好物',
       path: `/pages/detail/detail?id=${this.id}`,
       imageUrl: (p.images && p.images[0]) || ''
     }

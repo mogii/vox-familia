@@ -57,10 +57,6 @@ Page({
     wx.navigateTo({ url: `/pages/detail/detail?id=${e.currentTarget.dataset.id}` })
   },
 
-  goPublish() {
-    wx.navigateTo({ url: '/pages/publish/publish' })
-  },
-
   onShareAppMessage() {
     return {
       title: '我在卖宝宝闲置好物，快来挑挑看~',

@@ -2,7 +2,6 @@
   "pages": [
     "pages/index/index",
     "pages/detail/detail",
-    "pages/publish/publish",
     "pages/mine/mine"
   ],
   "window": {
@@ -18,7 +17,7 @@
     "borderStyle": "black",
     "list": [
       { "pagePath": "pages/index/index", "text": "逛闲置" },
-      { "pagePath": "pages/mine/mine", "text": "我的" }
+      { "pagePath": "pages/mine/mine", "text": "管理" }
     ]
   },
   "sitemapLocation": "sitemap.json",

@@ -15,7 +15,7 @@
 
   <view class="info">
     <view class="price-row">
-      <text class="price">¥{{product.price}}</text>
+      <text class="price">${{product.price}}</text>
       <text wx:if="{{product.status === 'sold'}}" class="sold-badge">已售出</text>
       <text class="condition">{{product.condition}}</text>
     </view>

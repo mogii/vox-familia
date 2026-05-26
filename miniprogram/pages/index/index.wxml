@@ -2,7 +2,7 @@
   <view wx:if="{{products.length === 0 && !loading}}" class="empty">
     <text class="empty-emoji">🍼</text>
     <text class="empty-text">还没有在售的闲置</text>
-    <text class="empty-sub">点击右下角按钮，发布第一件吧</text>
+    <text class="empty-sub">过会儿再来看看吧~</text>
   </view>
 
   <view class="grid">
@@ -17,7 +17,7 @@
       <view class="card-body">
         <view class="card-title">{{item.title}}</view>
         <view class="card-meta">
-          <text class="price">¥{{item.price}}</text>
+          <text class="price">${{item.price}}</text>
           <text class="condition">{{item.condition}}</text>
         </view>
       </view>
@@ -26,9 +26,4 @@
 
   <view wx:if="{{loading}}" class="loading">加载中...</view>
   <view wx:if="{{!hasMore && products.length > 0}}" class="nomore">没有更多了</view>
-
-  <view class="fab" bindtap="goPublish">
-    <text class="fab-plus">＋</text>
-    <text class="fab-text">发布</text>
-  </view>
 </view>

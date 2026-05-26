@@ -1,10 +1,12 @@
 const app = getApp()
+const config = require('../../config')
 const db = wx.cloud.database()
 
 Page({
   data: {
     products: [],
-    loading: false
+    loading: false,
+    isOwner: false
   },
 
   onShow() {
@@ -13,10 +15,13 @@ Page({
 
   load() {
     const run = () => {
-      this.setData({ loading: true })
+      this.setData({
+        loading: true,
+        isOwner: !!app.globalData.openid && app.globalData.openid === config.ownerOpenid
+      })
       db.collection('products')
-        .where({ _openid: app.globalData.openid })
         .orderBy('createTime', 'desc')
+        .limit(100)
         .get()
         .then(res => {
           this.setData({ products: res.data, loading: false })
@@ -43,10 +48,6 @@ Page({
 
   goDetail(e) {
     wx.navigateTo({ url: `/pages/detail/detail?id=${e.currentTarget.dataset.id}` })
-  },
-
-  goPublish() {
-    wx.navigateTo({ url: '/pages/publish/publish' })
   },
 
   updateStatus(id, status, tip) {
