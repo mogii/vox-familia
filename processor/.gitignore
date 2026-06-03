@@ -4,3 +4,9 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# 录制的视频素材，别进仓库
+*.mov
+*.MOV
+*.mp4
+*.MP4

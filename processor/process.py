@@ -51,7 +51,10 @@ def main():
         import anthropic
 
         config.require("ANTHROPIC_API_KEY")
-        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+        client_kwargs = {"api_key": config.ANTHROPIC_API_KEY}
+        if config.LLM_BASE_URL:  # Moonshot/Kimi 等 Anthropic 兼容端点
+            client_kwargs["base_url"] = config.LLM_BASE_URL
+        client = anthropic.Anthropic(**client_kwargs)
 
     listings = []
     for i, item in enumerate(items, 1):

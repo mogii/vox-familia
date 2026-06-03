@@ -46,7 +46,11 @@ def enrich(transcript, client=None):
     """Return {title, price, condition, description} for one item's transcript."""
     import anthropic
 
-    client = client or anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    if client is None:
+        kwargs = {"api_key": config.ANTHROPIC_API_KEY}
+        if config.LLM_BASE_URL:  # 指向 Moonshot/Kimi 等 Anthropic 兼容端点
+            kwargs["base_url"] = config.LLM_BASE_URL
+        client = anthropic.Anthropic(**kwargs)
 
     resp = client.messages.create(
         model=config.CLAUDE_MODEL,

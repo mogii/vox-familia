@@ -33,8 +33,13 @@ WHISPER_LANGUAGE = _get("WHISPER_LANGUAGE", "zh")
 WHISPER_DEVICE = _get("WHISPER_DEVICE", "auto")  # auto/cpu/cuda
 WHISPER_COMPUTE_TYPE = _get("WHISPER_COMPUTE_TYPE")  # e.g. int8, float16
 
-# --- Claude (price + title + description) ---
+# --- LLM (price + title + description) ---
+# 走 Anthropic Messages 接口。默认用官方 Claude；也可指向任何 Anthropic 兼容
+# 端点，比如 Moonshot/Kimi：把 LLM_BASE_URL 设为 https://api.moonshot.ai/anthropic、
+# 模型设为 kimi-k2.5、key 填你的 Moonshot key 即可。
 ANTHROPIC_API_KEY = _get("ANTHROPIC_API_KEY")
+# 兼容旧名：优先 LLM_BASE_URL，其次 ANTHROPIC_BASE_URL；都没有就用官方地址。
+LLM_BASE_URL = _get("LLM_BASE_URL") or _get("ANTHROPIC_BASE_URL")
 CLAUDE_MODEL = _get("CLAUDE_MODEL", "claude-sonnet-4-6")
 
 # --- Frame extraction ---

@@ -21,7 +21,9 @@ cp .env.example .env        # 然后编辑 .env 填上你的 key 等
 
 `.env` 里要填：
 
-- `ANTHROPIC_API_KEY` — Claude 的 key（提价格 / 写描述用，费用很小）
+- `ANTHROPIC_API_KEY` — 大模型 key（提价格 / 写描述用，费用很小）。可用官方 Claude，
+  也可用 **Moonshot/Kimi**：key 填这里，再把 `LLM_BASE_URL` 设为
+  `https://api.moonshot.ai/anthropic`、`CLAUDE_MODEL` 设为 `kimi-k2.5`（见 `.env.example`）
 - `CONTACT` — 你的微信号，会写进每件商品的「联系卖家」
 - 发布时还要 `WX_APPID` / `WX_APPSECRET` / `WX_ENV_ID`（见下方「发布」）
 
