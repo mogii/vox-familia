@@ -65,7 +65,9 @@ out/
 ## 第二步：网页里整理 + 生成成品图
 
 ```bash
-python webapp.py            # 然后浏览器打开 http://127.0.0.1:5000
+python webapp.py            # 然后浏览器打开 http://127.0.0.1:8000
+# 端口被占就换一个：python webapp.py --port 8123
+# （别用 5000/7000，新版 macOS 的 AirPlay 接收器占了那俩端口，会显示「拒绝访问」）
 ```
 
 网页里每件可以：

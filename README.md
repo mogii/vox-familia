@@ -50,7 +50,7 @@ pip install -r requirements.txt
 cp .env.example .env          # 填上大模型 key（官方 Claude 或 Moonshot/Kimi）
 
 python process.py 我的视频.mov  # 第一步：视频 → out/
-python webapp.py               # 第二步：浏览器开 http://127.0.0.1:5000 整理并生成成品图
+python webapp.py               # 第二步：浏览器开 http://127.0.0.1:8000 整理并生成成品图
 ```
 
 ## 关于价格

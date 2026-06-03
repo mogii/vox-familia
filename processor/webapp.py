@@ -270,7 +270,8 @@ load();
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="本地 listing 整理网页")
     ap.add_argument("--out", default="out", help="process.py 的输出目录")
-    ap.add_argument("--port", type=int, default=5000)
+    # 默认 8000；别用 5000/7000，新版 macOS 的 AirPlay 接收器占了那俩端口。
+    ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
     app.config["BASE_DIR"] = args.out
     print(f"打开 http://127.0.0.1:{args.port}  （素材目录：{args.out}）")
