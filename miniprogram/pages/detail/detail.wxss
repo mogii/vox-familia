@@ -55,6 +55,33 @@
   color: #222;
 }
 
+.market {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  background: #fff7f3;
+  border-radius: 10rpx;
+  padding: 12rpx 18rpx;
+}
+
+.market-label {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.market-price {
+  margin-left: 12rpx;
+  font-size: 28rpx;
+  color: #999;
+  text-decoration: line-through;
+}
+
+.market-src {
+  margin-left: auto;
+  font-size: 24rpx;
+  color: #ff7a45;
+}
+
 .desc {
   margin-top: 16rpx;
   font-size: 28rpx;

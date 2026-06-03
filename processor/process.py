@@ -17,6 +17,7 @@ import os
 
 import config
 import frames
+import marketprice
 from enrich import enrich
 from segment import find_items
 from transcribe import transcribe
@@ -31,7 +32,9 @@ def main():
     ap.add_argument("--fps", type=float, default=config.SAMPLE_FPS,
                     help="抽帧采样频率（每秒几帧）")
     ap.add_argument("--no-ai", action="store_true",
-                    help="跳过 Claude，只切段+抽图（价格/描述留空，手动填）")
+                    help="跳过大模型，只切段+抽图（价格/描述留空，手动填）")
+    ap.add_argument("--no-market", action="store_true",
+                    help="即使说了『查原价』也不联网搜市场价")
     args = ap.parse_args()
 
     if not os.path.isfile(args.video):
@@ -75,7 +78,23 @@ def main():
                 info = enrich(item["text"], client=client)
                 print(f"    {info['title']} / ${info['price']} / {info['condition']}")
             except Exception as e:
-                print(f"    [warn] Claude 整理失败，留空待手填：{e}")
+                print(f"    [warn] 大模型整理失败，留空待手填：{e}")
+
+        # 说了「查原价」才联网搜市场参考价。
+        market = {"searched": False, "price": None, "price_text": None, "source": None}
+        if not args.no_market and marketprice.wants_lookup(item["text"]):
+            print("    说了『查原价』，联网搜市场价中...")
+            try:
+                market = marketprice.lookup(item["text"])
+                if market["price"] is not None:
+                    print(f"    参考价 {market['price_text']}  来源 {market['source']}")
+                else:
+                    print("    搜过了，但没找到可靠价格（留空）")
+            except Exception as e:
+                # 搜索失败也算「搜过」，让你区分「搜了没到」和「压根没搜」。
+                market = {"searched": True, "price": None,
+                          "price_text": None, "source": None}
+                print(f"    [warn] 联网搜价失败：{e}")
 
         listings.append(
             {
@@ -85,6 +104,10 @@ def main():
                 "description": info["description"],
                 "contact": config.CONTACT,
                 "images": [os.path.relpath(p, args.out) for p in imgs],
+                "marketSearched": market["searched"],
+                "marketPrice": market["price"],
+                "marketPriceText": market["price_text"],
+                "marketSource": market["source"],
                 "transcript": item["text"],
             }
         )

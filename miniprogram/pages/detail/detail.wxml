@@ -20,6 +20,11 @@
       <text class="condition">{{product.condition}}</text>
     </view>
     <view class="title">{{product.title}}</view>
+    <view wx:if="{{product.marketPrice}}" class="market" bindtap="copySource">
+      <text class="market-label">新品参考价</text>
+      <text class="market-price">{{product.marketPriceText}}</text>
+      <text wx:if="{{product.marketSource}}" class="market-src">来源 ›</text>
+    </view>
     <view wx:if="{{product.desc}}" class="desc">{{product.desc}}</view>
   </view>
 

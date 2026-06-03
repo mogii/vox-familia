@@ -52,6 +52,16 @@ Page({
     })
   },
 
+  copySource() {
+    const src = this.data.product.marketSource
+    if (!src) return
+    // 小程序不能直接打开站外网页，复制链接给买家自行查看。
+    wx.setClipboardData({
+      data: src,
+      success: () => wx.showToast({ title: '参考来源链接已复制' })
+    })
+  },
+
   updateStatus(status, tip) {
     db.collection('products')
       .doc(this.id)

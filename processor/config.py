@@ -49,6 +49,16 @@ SAMPLE_FPS = float(_get("SAMPLE_FPS", "2"))  # candidate frames sampled per seco
 # --- Magic word(s) that separate items ---
 TRIGGERS = [t.strip() for t in _get("TRIGGERS", "").split(",") if t.strip()] or None
 
+# --- 市场价联网搜索（Moonshot/Kimi 的 $web_search，走 OpenAI 兼容接口）---
+# 录视频时对某件说出 PRICE_TRIGGERS 里的暗号，才会去联网查它的新品参考价。
+PRICE_TRIGGERS = [
+    t.strip() for t in _get("PRICE_TRIGGERS", "查原价").split(",") if t.strip()
+]
+SEARCH_BASE_URL = _get("SEARCH_BASE_URL", "https://api.moonshot.ai/v1")
+SEARCH_MODEL = _get("SEARCH_MODEL", "kimi-k2.5")
+# 搜索用的 key，默认复用上面的 key（Moonshot 同一把 key 两个接口都能用）。
+SEARCH_API_KEY = _get("SEARCH_API_KEY") or ANTHROPIC_API_KEY
+
 # --- Listing defaults ---
 CONTACT = _get("CONTACT", "")  # your WeChat id, written into every listing
 CURRENCY = _get("CURRENCY", "USD")

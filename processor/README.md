@@ -62,6 +62,10 @@ out/
   "description": "用了大概半年，推起来很顺，折叠方便。",
   "contact": "你的微信号",
   "images": ["item01/item01_1.jpg", "item01/item01_3.jpg"],
+  "marketSearched": false,
+  "marketPrice": null,
+  "marketPriceText": null,
+  "marketSource": null,
   "transcript": "（当时你说的原话，仅供参考）"
 }
 ```
@@ -70,6 +74,22 @@ out/
 - 描述、标题、成色随便改。
 - 图不满意：直接去 `out/itemNN/` 删掉那张文件，或在 `images` 里删掉那一行。
 - 整件不想发：把这一段从数组里删掉即可。
+
+### 查市场价（说「查原价」才触发）
+
+录视频时，对想查价的那件多说一句「**查原价**」，脚本就会联网搜它的**新品参考价**
+（用 Moonshot/Kimi 的联网搜索），写进这几个字段：
+
+- `marketSearched` — 这件**有没有搜过**。`true`=搜过，`false`=你没说暗号、没搜。
+- `marketPrice` / `marketPriceText` — 搜到的参考价（数字 / 给人看的文本，如 `$169.99–$199.99`）。
+  搜过但没找到可靠价格时是 `null`——所以 `marketSearched:true` + `marketPrice:null`
+  就表示「搜了但没搜到」，和「压根没搜」区分得开。
+- `marketSource` — 参考来源链接。
+
+发布后，详情页会在标题下显示「新品参考价 ~~$X~~」并可复制来源链接，让买家一眼看到省了多少。
+2019 这种老款未必有精确对应价，都是参考，可随时手改或删掉这几个字段。
+
+> 不想搜可以加 `--no-market`；或在 `.env` 里改 `PRICE_TRIGGERS` 换暗号。
 
 ## 第三步：发布到小程序
 

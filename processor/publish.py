@@ -75,6 +75,11 @@ def main():
             "status": "available",
             "createTime": int(time.time() * 1000),
         }
+        # 市场参考价（只有搜到才带上，详情页显示「新品参考价 …」）
+        if item.get("marketPrice") is not None:
+            doc["marketPrice"] = float(item["marketPrice"])
+            doc["marketPriceText"] = item.get("marketPriceText") or ""
+            doc["marketSource"] = item.get("marketSource") or ""
         ids = wxcloud.db_add(token, env, config.PRODUCTS_COLLECTION, [doc])
         item["published"] = True
         published += 1
