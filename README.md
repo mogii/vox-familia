@@ -1,104 +1,67 @@
-# 宝宝闲置小铺
+# 宝宝闲置 · 视频转成品图
 
-在微信群里卖宝宝闲置用品的小工具。卖东西的人**不用一件件手动拍照填表**：对着摄像头
-把要卖的东西一件件说一遍（说「下一件」切换），在自己电脑上跑个脚本，它就自动转成
-一条条商品（挑好图、听出价格、写好描述）发布到小程序，群里的人打开就能逛、就能买。
+一个帮你在微信群里卖宝宝闲置的本地小工具。不用一件件手动拍照填表，也不用做小程序：
 
-整体分两块：
+> **对着摄像头把要卖的东西一件件说一遍**（说「下一件」切换，想查价就说「查原价」）
+> → 电脑上跑两步 → 得到一张张**可直接发群的成品图**（照片 + 价格 + 原价 + 描述）。
 
-- **`processor/`** — 本地 Python 脚本：视频 → 商品。语音转文字在本地跑（视频不出你电脑），
-  只有口述文字交给 Claude 整理价格和描述。详见 [`processor/README.md`](processor/README.md)。
-- **`miniprogram/`** — 微信小程序（基于云开发，不用买服务器）：群里的人逛闲置、看详情、
-  复制联系方式、分享到群；你自己能标记「已售」「删除」。商品由脚本发布，小程序里没有
-  手动发布页。
+卖东西还是用你最习惯的方式——在群里一张张发图。这个工具只是帮你把「整理 + 配文 + 排版」
+这件最烦的事自动化了。全程在你电脑本地跑，视频不外传。
 
-> 价格用**美元（$）**。微信支付需要企业资质，个人号开不了，所以不做线上收银 —— 买家
-> 看中后照着联系方式加你微信、直接转账，这也是群里卖闲置最常见的方式。
-
-## 整体流程
+## 流程
 
 ```
-录视频(边说边介绍, 说「下一件」切换)
+录视频(边说边介绍, 说「下一件」切换, 想查价说「查原价」)
         │
-        ▼  电脑本地
-  python process.py 视频.mp4   → 转文字 → 切段 → 挑图 → Claude 提价格/写描述
+        ▼  电脑本地，python process.py 视频.mov
+  转文字 → 切段 → 每件挑最清晰的图 → 大模型提价格/写描述 →（查原价的）联网搜参考价
         │
-        ▼  你检查 out/listings.json，删掉不要的图、改改价格
-  python publish.py            → 传图 + 写入云开发 products 集合
+        ▼  python webapp.py  → 浏览器里
+  每件挑用哪几张图 / 改标题价格描述 / 给每张图加一句话 → 一键合成「一张长图」
         │
         ▼
-  小程序「逛闲置」立刻能看到 → 分享到微信群
+  out/posts/ 里的成品图，一张张发微信群
 ```
 
 ## 项目结构
 
 ```
 .
-├── processor/                   本地处理脚本（见 processor/README.md）
-│   ├── process.py               视频 → out/listings.json + 图片
-│   ├── publish.py               out/ → 微信云开发
-│   └── ...
-├── miniprogram/                 小程序前端
-│   ├── config.js                ← 填云环境 ID 和你的 openid
-│   └── pages/
-│       ├── index/               逛闲置（首页）
-│       ├── detail/              商品详情 + 分享
-│       └── mine/                管理（标记已售/恢复/删除，仅你可见）
-├── cloudfunctions/
-│   └── login/                   云函数：返回当前用户 openid
-└── project.config.json          ← 填你的小程序 AppID
+└── processor/                 本地脚本 + 网页（见 processor/README.md）
+    ├── process.py             视频 → out/listings.json + 每件挑好的图
+    ├── webapp.py              本地网页：挑图/改字/加文字/生成成品图
+    ├── compose.py             把多张图合成一张长图（印标题/价格/原价/描述）
+    ├── marketprice.py         「查原价」联网搜新品参考价（Kimi $web_search）
+    ├── transcribe.py          本地 Whisper 语音转文字
+    ├── segment.py             按「下一件」切段
+    ├── frames.py              抽帧并挑最清晰的几张
+    ├── enrich.py              大模型提价格 / 写标题描述
+    └── README.md              详细使用说明
 ```
 
-## 小程序怎么跑起来
+## 快速开始
 
-### 1. 申请小程序、装工具
-1. 在 [微信公众平台](https://mp.weixin.qq.com) 注册小程序，拿到 **AppID**（个人主体即可）。
-2. 装 [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)。
+都在 `processor/` 目录里，详见 [`processor/README.md`](processor/README.md)：
 
-### 2. 导入项目
-1. 开发者工具 →「导入项目」→ 选本仓库根目录。
-2. 把 `project.config.json` 里的 `appid` 改成你自己的。
+```bash
+cd processor
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env          # 填上大模型 key（官方 Claude 或 Moonshot/Kimi）
 
-### 3. 开通云开发
-1. 开发者工具顶部点 **「云开发」**，按提示开通（个人账号有免费额度）。
-2. 创建环境，复制**环境 ID**（形如 `baby-resale-2xxxxx`），填到 `miniprogram/config.js`
-   的 `cloudEnv`。
+python process.py 我的视频.mov  # 第一步：视频 → out/
+python webapp.py               # 第二步：浏览器开 http://127.0.0.1:5000 整理并生成成品图
+```
 
-### 4. 建数据库集合 + 设权限
-1. 「云开发控制台 → 数据库」新建集合，名字必须是 **`products`**。
-2. 这个集合的发布由本地脚本（管理端）完成，标记已售/删除由你本人在小程序里操作。
-   把权限设成**自定义安全规则**：
+## 关于价格
 
-   ```json
-   {
-     "read": true,
-     "write": "auth.openid == \"你的OPENID\""
-   }
-   ```
+价格用**美元（$）**。这个工具不经手任何支付——买家在群里看中后照你平时的方式私聊、
+转账即可。「原价」是大模型联网搜到的**新品参考价**，只在你录视频时说了「查原价」的那件才有，
+都当参考、可随时改或删。
 
-   这样所有人都能逛，只有你能改/删。
+## 大模型 / 隐私
 
-### 5. 部署 login 云函数
-1. 左侧文件树右键 `cloudfunctions/login`。
-2. 选 **「上传并部署：云端安装依赖」**。
-
-### 6. 填上你的 openid
-1. 编译运行一次，在控制台看到 `login` 云函数返回的 `openid`，复制它。
-2. 填到 `miniprogram/config.js` 的 `ownerOpenid`，也填进上面第 4 步的安全规则里。
-   （这样「管理」页和详情页的管理按钮只对你显示。）
-
-### 7. 发布第一批商品
-按 [`processor/README.md`](processor/README.md) 在电脑上处理一个视频并 `publish.py`，
-然后小程序「逛闲置」刷新即可看到。
-
-## 常见问题
-
-- **「逛闲置」一直加载失败**：多半是 `config.js` 的环境 ID 没填对，或 `products` 集合没建。
-- **看不到「标记已售/删除」按钮**：确认 `config.js` 的 `ownerOpenid` 是你本人的、`login`
-  云函数已部署。
-- **`publish.py` 报取不到 access_token**：检查 AppID/AppSecret，以及云开发/小程序后台的
-  IP 白名单是否放行了你电脑的公网 IP。
-
-## 上线
-
-测试没问题后，在开发者工具点「上传」，再到微信公众平台「版本管理」提交审核、发布。
+- 语音转文字：**本地** Whisper，视频和音频不出你电脑。
+- 价格/描述、联网查原价：把那一小段**文字**发给大模型（官方 Claude 或 Moonshot/Kimi，
+  用你自己的 key）。费用很小。
+- 没有服务器、没有云数据库、不上传任何图片。成品图只存在你本地 `out/posts/`。

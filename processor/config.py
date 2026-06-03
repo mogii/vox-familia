@@ -60,11 +60,5 @@ SEARCH_MODEL = _get("SEARCH_MODEL", "kimi-k2.5")
 SEARCH_API_KEY = _get("SEARCH_API_KEY") or ANTHROPIC_API_KEY
 
 # --- Listing defaults ---
-CONTACT = _get("CONTACT", "")  # your WeChat id, written into every listing
+CONTACT = _get("CONTACT", "")  # your WeChat id, kept in listings for reference
 CURRENCY = _get("CURRENCY", "USD")
-
-# --- WeChat 云开发 (only needed by publish.py) ---
-WX_APPID = _get("WX_APPID")
-WX_APPSECRET = _get("WX_APPSECRET")
-WX_ENV_ID = _get("WX_ENV_ID")
-PRODUCTS_COLLECTION = _get("PRODUCTS_COLLECTION", "products")

@@ -117,7 +117,7 @@ def main():
         json.dump(listings, fh, ensure_ascii=False, indent=2)
 
     print(f"\n[done] 写好 {len(listings)} 件 -> {out_json}")
-    print("检查/修改 listings.json，删掉不要的图，然后跑：python publish.py")
+    print("接着跑：python webapp.py  在网页里挑图/改字/生成成品图。")
 
 
 if __name__ == "__main__":

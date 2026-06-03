@@ -1,0 +1,15 @@
+.DS_Store
+*.pyc
+__pycache__/
+venv/
+.venv/
+
+# 此前语音AI方向的遗留数据，非本工具内容
+core/
+temp/
+
+# 录制素材
+*.mov
+*.MOV
+*.mp4
+*.MP4
