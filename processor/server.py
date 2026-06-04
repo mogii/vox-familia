@@ -7,8 +7,18 @@ or just:
 """
 
 import asyncio
+import io
 import os
-from typing import Optional
+from typing import List, Optional
+
+from PIL import Image, ImageOps
+
+try:  # iPhone 默认拍 HEIC；装了 pillow-heif 就能直接读
+    from pillow_heif import register_heif_opener
+
+    register_heif_opener()
+except ImportError:
+    pass
 
 from fastapi import (
     Depends,
@@ -123,23 +133,86 @@ async def view_job(request: Request, job_id: str = JOB_ID, _: None = Depends(_ch
 
 # ---------- upload ----------
 
+VIDEO_EXTS = {".mov", ".mp4", ".m4v", ".avi", ".mkv"}
+
+
+def _is_video(f: UploadFile) -> bool:
+    ext = os.path.splitext(f.filename or "")[1].lower()
+    return ext in VIDEO_EXTS or (f.content_type or "").startswith("video/")
+
+
 @app.post("/upload")
 async def upload(
-    request: Request, file: UploadFile, _: None = Depends(_check_token),
+    request: Request, file: List[UploadFile], _: None = Depends(_check_token),
 ):
-    name = file.filename or "video.mov"
-    # Keep the original filename inside the job dir, but make sure it's safe.
-    safe = "".join(c for c in name if c.isalnum() or c in ("-", "_", ".")) or "video.mov"
-    job_id = jobs.create_job(safe)
-    target = os.path.join(jobs.job_dir(job_id), safe)
-    with open(target, "wb") as fh:
-        while True:
-            chunk = await file.read(1024 * 1024)
-            if not chunk:
-                break
-            fh.write(chunk)
-    asyncio.create_task(_run_worker(job_id))
-    return {"ok": True, "id": job_id}
+    """同一个入口收视频或照片（快捷指令多选照片时是多个同名 file 字段）。
+
+    - 视频：照旧建 job 跑整条管线（多个文件里有视频就取第一个）。
+    - 照片：一次分享的几张算**一件商品**——直接生成一个处理完的 job，
+      照片全勾上，标题/价格/描述留空到网页里填。HEIC 转 JPEG、按 EXIF 摆正。
+    """
+    if not file:
+        raise HTTPException(400, "no file")
+
+    videos = [f for f in file if _is_video(f)]
+    if videos:
+        v = videos[0]
+        name = v.filename or "video.mov"
+        # Keep the original filename inside the job dir, but make sure it's safe.
+        safe = "".join(c for c in name if c.isalnum() or c in ("-", "_", ".")) or "video.mov"
+        job_id = jobs.create_job(safe)
+        target = os.path.join(jobs.job_dir(job_id), safe)
+        with open(target, "wb") as fh:
+            while True:
+                chunk = await v.read(1024 * 1024)
+                if not chunk:
+                    break
+                fh.write(chunk)
+        asyncio.create_task(_run_worker(job_id))
+        return {"ok": True, "id": job_id, "kind": "video"}
+
+    # --- 纯照片：一件商品，无需跑管线 ---
+    job_id = jobs.create_job(f"照片×{len(file)}")
+    item_dir = os.path.join(jobs.job_dir(job_id), "items", "0")
+    os.makedirs(item_dir, exist_ok=True)
+
+    candidates = []
+    for i, f in enumerate(file):
+        data = await f.read()
+        try:
+            img = Image.open(io.BytesIO(data))
+            img = ImageOps.exif_transpose(img).convert("RGB")
+        except Exception:
+            continue  # 读不了的跳过（比如混进来的非图片文件）
+        fn = f"photo_{i + 1:03d}.jpg"
+        img.save(os.path.join(item_dir, fn), "JPEG", quality=92)
+        candidates.append({"filename": fn, "sharpness": 0})
+
+    if not candidates:
+        jobs.patch_state(job_id, {"stage": "error", "message": "没有能读取的图片"})
+        raise HTTPException(400, "没有能读取的图片")
+
+    listing = {
+        "title": "",
+        "price": None,
+        "condition": None,
+        "description": "",
+        "contact": config.CONTACT,
+        "transcript": "",
+        "candidates": candidates,
+        "selected": list(range(len(candidates))),
+        "captions": {},
+        "marketSearched": False,
+        "marketPrice": None,
+        "marketPriceText": None,
+        "marketSource": None,
+    }
+    jobs.patch_state(job_id, {
+        "stage": "done",
+        "message": "照片已就绪",
+        "listings": [listing],
+    })
+    return {"ok": True, "id": job_id, "kind": "photos", "count": len(candidates)}
 
 
 # ---------- JSON API ----------
