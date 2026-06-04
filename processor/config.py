@@ -9,7 +9,7 @@ try:
     from dotenv import load_dotenv
 
     load_dotenv()
-except ImportError:  # dotenv is optional; real env vars still work.
+except ImportError:
     pass
 
 
@@ -28,23 +28,21 @@ def require(name):
 
 
 # --- Whisper (local speech-to-text) ---
-WHISPER_MODEL = _get("WHISPER_MODEL", "small")  # tiny/base/small/medium/large-v3
+WHISPER_MODEL = _get("WHISPER_MODEL", "small")
 WHISPER_LANGUAGE = _get("WHISPER_LANGUAGE", "zh")
-WHISPER_DEVICE = _get("WHISPER_DEVICE", "auto")  # auto/cpu/cuda
-WHISPER_COMPUTE_TYPE = _get("WHISPER_COMPUTE_TYPE")  # e.g. int8, float16
+WHISPER_DEVICE = _get("WHISPER_DEVICE", "auto")
+WHISPER_COMPUTE_TYPE = _get("WHISPER_COMPUTE_TYPE")
 
 # --- LLM (price + title + description) ---
-# 走 Anthropic Messages 接口。默认用官方 Claude；也可指向任何 Anthropic 兼容
-# 端点，比如 Moonshot/Kimi：把 LLM_BASE_URL 设为 https://api.moonshot.ai/anthropic、
-# 模型设为 kimi-k2.5、key 填你的 Moonshot key 即可。
+# 走 Anthropic Messages 接口。默认官方 Claude；也可指向任何 Anthropic 兼容端点，
+# 比如 Moonshot/Kimi：LLM_BASE_URL=https://api.moonshot.ai/anthropic + kimi-k2.5。
 ANTHROPIC_API_KEY = _get("ANTHROPIC_API_KEY")
-# 兼容旧名：优先 LLM_BASE_URL，其次 ANTHROPIC_BASE_URL；都没有就用官方地址。
 LLM_BASE_URL = _get("LLM_BASE_URL") or _get("ANTHROPIC_BASE_URL")
 CLAUDE_MODEL = _get("CLAUDE_MODEL", "claude-sonnet-4-6")
 
 # --- Frame extraction ---
 FRAMES_PER_ITEM = int(_get("FRAMES_PER_ITEM", "5"))
-SAMPLE_FPS = float(_get("SAMPLE_FPS", "2"))  # candidate frames sampled per second
+SAMPLE_FPS = float(_get("SAMPLE_FPS", "2"))
 
 # --- Magic word(s) that separate items ---
 TRIGGERS = [t.strip() for t in _get("TRIGGERS", "").split(",") if t.strip()] or None
@@ -59,6 +57,34 @@ SEARCH_MODEL = _get("SEARCH_MODEL", "kimi-k2.5")
 # 搜索用的 key，默认复用上面的 key（Moonshot 同一把 key 两个接口都能用）。
 SEARCH_API_KEY = _get("SEARCH_API_KEY") or ANTHROPIC_API_KEY
 
-# --- Listing defaults ---
-CONTACT = _get("CONTACT", "")  # your WeChat id, kept in listings for reference
-CURRENCY = _get("CURRENCY", "USD")
+# --- Defaults written into listings ---
+CONTACT = _get("CONTACT", "")  # WeChat id stamped into each listing's "contact"
+CURRENCY_SYMBOL = _get("CURRENCY_SYMBOL", "$")
+
+# --- Web server (server.py) ---
+JOBS_DIR = _get("JOBS_DIR", "jobs")
+SERVER_HOST = _get("SERVER_HOST", "0.0.0.0")
+SERVER_PORT = int(_get("SERVER_PORT", "8000"))
+# Shared secret added to every request from the phone. Pick something long.
+SERVER_TOKEN = _get("SERVER_TOKEN", "")
+# Public base URL the phone uses, e.g. http://mymac.local:8000
+# Embedded in image URLs that the Shortcut fetches, so it must be reachable.
+PUBLIC_BASE_URL = _get("PUBLIC_BASE_URL", "")
+
+# Name of the iOS Shortcut that saves images to Photos. The web buttons link to
+# `shortcuts://run-shortcut?name=<this>`, so it has to match exactly.
+SAVE_SHORTCUT_NAME = _get("SAVE_SHORTCUT_NAME", "保存闲置图")
+
+# --- Poster rendering ---
+# Pillow can't render Chinese without a CJK font. We try these in order.
+POSTER_FONT = _get(
+    "POSTER_FONT",
+    ":".join(
+        [
+            "/System/Library/Fonts/PingFang.ttc",
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            "/System/Library/Fonts/STHeiti Medium.ttc",
+            "/Library/Fonts/Arial Unicode.ttf",
+        ]
+    ),
+)

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>宝宝闲置</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header>
+    <div class="title">宝宝闲置</div>
+    {% if history %}
+    <details class="history">
+      <summary>最近</summary>
+      <ul>
+        {% for h in history %}
+        <li>
+          <a href="/j/{{ h.id }}{% if token %}?t={{ token }}{% endif %}">
+            {{ h.video_filename }}
+            <span class="muted">· {{ h.stage }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </header>
+
+  {% if not active %}
+    <main class="empty">
+      <p>还没有视频。手机上录一段，用「处理闲置」分享过来即可。</p>
+      <p class="muted">这个页面会自动刷新；下拉也行。</p>
+    </main>
+  {% elif active.stage in ('queued','transcribing','segmenting','extracting','enriching') %}
+    <main class="processing">
+      <div class="spinner"></div>
+      <div class="msg">{{ active.message or '处理中...' }}</div>
+      {% if active.progress %}
+      <div class="muted">{{ active.progress.done }} / {{ active.progress.total }}</div>
+      {% endif %}
+      <div class="muted small">视频：{{ active.video_filename }}</div>
+    </main>
+  {% elif active.stage == 'error' %}
+    <main class="error">
+      <p>处理失败：{{ active.message }}</p>
+    </main>
+  {% else %}
+    <main data-job-id="{{ active.id }}">
+      <div class="meta">
+        <span>视频：{{ active.video_filename }}</span>
+        <span>·</span>
+        <span>{{ active.listings|length }} 件</span>
+      </div>
+
+      {% for L in active.listings %}
+        {% set n = loop.index0 %}
+        {% set qs = ('?t=' ~ token) if token else '' %}
+        {% set amp_t = ('&t=' ~ token) if token else '' %}
+        <section class="listing" data-n="{{ n }}">
+          <h2>第 {{ loop.index }} 件</h2>
+
+          <label>标题
+            <input data-field="title" value="{{ L.title or '' }}" placeholder="标题">
+          </label>
+
+          <div class="row">
+            <label class="grow">价格 ({{ currency }})
+              <input data-field="price" type="number" inputmode="decimal" step="0.01"
+                     value="{{ L.price if L.price is not none else '' }}">
+            </label>
+            <label class="grow">成色
+              <select data-field="condition">
+                <option value="">--</option>
+                {% for c in conditions %}
+                  <option value="{{ c }}" {% if L.condition == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+
+          <label>描述
+            <textarea data-field="description" rows="3" placeholder="买家看到的描述">{{ L.description or '' }}</textarea>
+          </label>
+
+          <details class="muted">
+            <summary>当时说的原话</summary>
+            <div class="transcript">{{ L.transcript }}</div>
+          </details>
+
+          <div class="thumbs">
+            {% for c in L.candidates %}
+              {% set k = loop.index0 %}
+              {% set is_sel = k in L.selected %}
+              <button class="thumb {% if is_sel %}sel{% endif %}" data-idx="{{ k }}" type="button">
+                <img loading="lazy"
+                     data-src="/jobs/{{ active.id }}/items/{{ n }}/{{ c.filename }}{{ qs }}">
+                <span class="pick">{% if is_sel %}✓{% endif %}</span>
+              </button>
+            {% endfor %}
+          </div>
+
+          <div class="actions">
+            <a class="btn shortcut-link" href="#"
+               data-target="/jobs/{{ active.id }}/listings/{{ n }}/export.json?kind=originals{{ amp_t }}">
+              导出原图到相册
+            </a>
+            <a class="btn alt shortcut-link" href="#"
+               data-target="/jobs/{{ active.id }}/listings/{{ n }}/export.json?kind=poster{{ amp_t }}">
+              导出海报图
+            </a>
+            <a class="btn ghost" target="_blank"
+               href="/jobs/{{ active.id }}/posters/{{ n }}.jpg{{ qs }}">
+              预览海报
+            </a>
+          </div>
+        </section>
+      {% endfor %}
+    </main>
+  {% endif %}
+
+  <script>
+    const TOKEN = new URLSearchParams(location.search).get('t') || '';
+    const tQs = TOKEN ? ('?t=' + encodeURIComponent(TOKEN)) : '';
+
+    // Build shortcuts:// URLs in JS so we can URL-encode the inner export URL
+    // properly (it contains its own ? and & which would otherwise collide).
+    const SHORTCUT_NAME = {{ save_shortcut|tojson }};
+    document.querySelectorAll('a.shortcut-link').forEach(a => {
+      const target = location.origin + a.dataset.target;
+      a.href = 'shortcuts://run-shortcut?name=' + encodeURIComponent(SHORTCUT_NAME)
+             + '&input=text&text=' + encodeURIComponent(target);
+    });
+
+    // Resolve lazy-load image srcs (kept off-DOM until now so we don't fetch
+    // hundreds in parallel before display).
+    document.querySelectorAll('img[data-src]').forEach(img => {
+      img.src = img.dataset.src;
+    });
+
+    const main = document.querySelector('main[data-job-id]');
+    const jobId = main ? main.dataset.jobId : null;
+
+    function postPatch(n, patch) {
+      return fetch('/api/jobs/' + jobId + '/listings/' + n + tQs, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+    }
+
+    const timers = new WeakMap();
+    function debouncedPatch(el, n, fieldName, value) {
+      clearTimeout(timers.get(el));
+      timers.set(el, setTimeout(() => {
+        const v = (fieldName === 'price')
+          ? (value === '' ? null : Number(value))
+          : value;
+        postPatch(n, { [fieldName]: v });
+      }, 400));
+    }
+
+    document.querySelectorAll('.listing').forEach(section => {
+      const n = Number(section.dataset.n);
+
+      section.querySelectorAll('input, textarea, select').forEach(el => {
+        const field = el.dataset.field;
+        if (!field) return;
+        el.addEventListener('input', () => debouncedPatch(el, n, field, el.value));
+        el.addEventListener('change', () => debouncedPatch(el, n, field, el.value));
+      });
+
+      section.querySelectorAll('.thumb').forEach(btn => {
+        btn.addEventListener('click', () => {
+          btn.classList.toggle('sel');
+          btn.querySelector('.pick').textContent = btn.classList.contains('sel') ? '✓' : '';
+          const sel = [...section.querySelectorAll('.thumb.sel')]
+            .map(b => Number(b.dataset.idx))
+            .sort((a, b) => a - b);
+          postPatch(n, { selected: sel });
+        });
+      });
+    });
+
+    // Poll: if the active job changes (e.g. a new upload finishes), reload.
+    async function poll() {
+      try {
+        const r = await fetch('/status.json' + tQs);
+        if (!r.ok) return;
+        const s = await r.json();
+        const stage = s.active ? s.active.stage : null;
+        const home = location.pathname === '/';
+
+        if (home && s.active && jobId && s.active.id !== jobId) {
+          location.reload();
+          return;
+        }
+        if (!jobId && s.active) {
+          const settled = !['queued','transcribing','segmenting','extracting','enriching'].includes(stage);
+          if (settled) { location.reload(); return; }
+          const msg = document.querySelector('.processing .msg');
+          const prog = document.querySelector('.processing .muted:not(.small)');
+          if (msg && s.active.message) msg.textContent = s.active.message;
+          if (prog && s.active.progress) {
+            prog.textContent = s.active.progress.done + ' / ' + s.active.progress.total;
+          }
+        }
+      } catch (_) {}
+    }
+    setInterval(poll, 5000);
+  </script>
+</body>
+</html>
