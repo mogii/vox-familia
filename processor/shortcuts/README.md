@@ -1,94 +1,103 @@
-# iPhone 上要建的两个「快捷指令」
+# iPhone 上要建的两个 Shortcuts（按英文系统写）
 
-整套流程只在 iPhone 上加两个 Shortcuts（不用装 App、不用越狱）：
+整套流程只在 iPhone 的 **Shortcuts** App 里加两条捷径（不用装 App、不用越狱）。
+下面所有动作名按**英文 iOS** 写（手机是英文系统就照着搜），括号里是中文对照。
 
-1. **处理闲置**（出现在视频的「分享」面板里）— 把刚录的视频发给 Mac。
-2. **保存闲置图**（被网页里的按钮调起）— 把后端给的若干张图依次存到相册。
-
-下面的步骤用「快捷指令」这个 App 自带的动作搭，每条 1～2 分钟就能搭好。所有"动作"
-名字都按 iOS 中文版来写。
-
-> 前提：Mac 已经启动 `python server.py` 跑起来了；你也知道 Mac 的局域网地址
-> （例如 `http://nicks-macbook.local:8000`）和 `.env` 里的 `SERVER_TOKEN`。
-
----
-
-## 快捷指令 1：处理闲置
-
-**作用**：你在「照片」里点一个视频 → 分享 → 选「处理闲置」→ 视频自动上传到 Mac。
-
-新建 Shortcut，名字取作 **处理闲置**，然后：
-
-### 设置（点右上角 ⓘ）
-
-- **在分享表单中显示**：开
-- **分享表单类型**：只勾「媒体」(也可以保留「文件」以兼容某些相册转发场景)
-
-### 动作（按顺序添加）
-
-1. **接收**：从「分享表单」接收 **媒体**
-2. **获取 URL 的内容**（"Get Contents of URL"）
-   - URL：`http://nicks-macbook.local:8000/upload`
-     （改成你 Mac 实际的 .local 地址；不知道地址就在 Mac 系统设置里「共享 → 本地主机名」看）
-   - 方法：**POST**
-   - 请求体：**表单**（Form）
-     - 添加字段：键名 `file`，值选「快捷指令输入」（类型会自动识别为文件）
-   - 请求头：
-     - 键 `Authorization`，值 `Bearer <你的 SERVER_TOKEN>`
-3. **显示通知**（可选）：内容写"已上传，去网页等结果"
-
-保存即可。之后在「照片」里选一个视频 → 分享按钮 → 划到底找到「处理闲置」点一下，
-完成。
-
-> 上传通常几秒钟（局域网很快）。视频本体会留在你相册里，原视频不会被改动。
+> 前提：Mac 已经启动 `python server.py`。服务地址形如：
+>
+> ```
+> http://morrys-macbook-air.local:8000
+> ```
+>
+> （自己的主机名在 Mac 终端 `scutil --get LocalHostName` 查，加 `.local:8000`。）
+>
+> `.env` 里 `SERVER_TOKEN` 留空的话，下面所有 token/Authorization 相关步骤**直接跳过**。
 
 ---
 
-## 快捷指令 2：保存闲置图
+## Shortcut 1：处理闲置（上传视频）
 
-**作用**：网页里点「导出原图到相册」或「导出海报图」按钮 → 这条快捷指令被自动调起 →
-依次把每张图存到相册。
+**作用**：Photos 里选中刚录的视频 → Share → 点这条捷径 → 视频自动上传到 Mac。
 
-新建 Shortcut，名字取作 **保存闲置图**（要和 `.env` 里的 `SAVE_SHORTCUT_NAME`
-一致；默认就是这个）。
+Shortcuts App → **+** 新建，名字随意（出现在分享面板里，建议叫 **处理闲置** 或
+**Process Listing**），然后：
 
 ### 设置
 
-- **在分享表单中显示**：关
-- **接收输入**：开，类型 **文本**
+- 点顶部标题旁的 ⌄（或 ⓘ 面板）→ **Show in Share Sheet**（在分享表单中显示）：开
+- 点 **Receive** 那行，接收类型只勾 **Media**（媒体）（保留 **Files** 也行）
+
+### 动作（按顺序添加，搜英文名）
+
+1. 顶部会自动有 **Receive [Media] input from [Share Sheet]**
+2. 添加 **Get Contents of URL**（获取 URL 的内容），点开箭头展开选项：
+   - **URL**：`http://morrys-macbook-air.local:8000/upload`
+   - **Method**：**POST**
+   - **Request Body**：**Form**（表单）
+     - **Add new field** → 类型选 **File**：Key 填 `file`，Value 点一下选变量
+       **Shortcut Input**（快捷指令输入）
+   - （只有设了 SERVER_TOKEN 才要）**Headers** → **Add new header**：
+     Key `Authorization`，Value `Bearer 你的SERVER_TOKEN`
+3. （可选）添加 **Show Notification**（显示通知）：内容写 `已上传，去网页等结果`
+
+保存即可。用法：Photos 选视频 → **Share** → 往下划找到这条捷径 → 点一下。
+
+> 局域网上传通常几秒钟。原视频留在相册里不会被改动。
+
+---
+
+## Shortcut 2：保存闲置图（导出到相册）
+
+**作用**：网页里点「导出原图到相册」或「导出成品长图」→ 这条捷径被自动调起 →
+把每张图存进相册。
+
+新建捷径，**名字必须和 `.env` 里 `SAVE_SHORTCUT_NAME` 一致**——默认是
+**保存闲置图**（英文系统上用中文名没问题，照打就行；想用英文名如 `SaveListingPix`
+也行，但要同步改 `.env` 里的 `SAVE_SHORTCUT_NAME` 并重启 server）。
+
+### 设置
+
+- **Show in Share Sheet**：关（不用开）
+- 网页通过 `shortcuts://` 链接调它，输入是一段文本（一个 URL）
 
 ### 动作（按顺序添加）
 
-1. **获取 URL 的内容**
-   - URL：**快捷指令输入**（点 URL 输入框 → 变量 → Shortcut Input）
-   - 方法：GET（默认）
-   - 返回的就是后端给的 JSON 数组，例如 `["http://mac/...a.jpg", "http://mac/...b.jpg"]`
-2. **重复以下操作**：对象 = 上一步「获取 URL 的内容」
-   - 内部添加 **获取 URL 的内容**：URL = **重复项**（变量），方法 GET
-     - 这一步会把每张图下载下来（变成"图像"类型的变量）
-   - 内部添加 **存储到相册**（Save to Photo Album）：项目 = 上一步「获取 URL 的内容」
-     的输出；相册选「最近项目」即可
-3. **显示通知**（可选）：内容写"已保存到相册"
+1. **Get Contents of URL**：
+   - **URL**：点输入框 → 选变量 **Shortcut Input**
+   - **Method**：**GET**（默认）
+   - 返回的是 JSON 数组，例如 `["http://mac/...a.jpg", "http://mac/...b.jpg"]`
+2. **Repeat with Each**（重复每个项目）：对象选上一步 **Contents of URL**
+   - 循环内部添加 **Get Contents of URL**：URL 选变量 **Repeat Item**（重复项），
+     Method **GET** —— 这一步把每张图下载下来
+   - 循环内部再添加 **Save to Photo Album**（存储到相册）：保存对象选上一步的
+     **Contents of URL**，相册 **Recents**（最近项目）即可
+3. （可选）**Show Notification**：内容写 `已保存到相册`
 
-保存。
-
-> 这条快捷指令也可以从分享面板里手动跑，但日常用法是浏览器里点按钮把它叫起来。
+> 第一次运行会弹权限确认（访问网络 / 添加到 Photos），都点 **Allow**。
 
 ---
 
 ## 验证
 
-1. iPhone 浏览器打开 `http://nicks-macbook.local:8000/?t=<你的SERVER_TOKEN>`，应该看到"还没有视频"的页面。
-2. 录一段口述视频，分享 → 处理闲置，等几秒，页面下拉刷新（或等它自己刷新）。
-3. 看到处理好的商品列表，挑图、改价格描述，点「导出原图到相册」，相册里应该多了几张。
+1. iPhone Safari 打开 `http://morrys-macbook-air.local:8000`（设了 token 就加
+   `/?t=<token>`），看到"还没有视频"页面就对了。**Add to Home Screen**（添加到主屏幕）
+   方便下次开。
+2. 录一段口述视频（说「下一件」切件、想比价说「查原价」），Share → 处理闲置。
+3. 回到网页：处理中会显示转圈和进度，完成后自动刷出商品列表。
+4. 改改字、勾勾图、给图配句话 → 点「导出成品长图」→ 弹出 Shortcuts 跑完 →
+   去 Photos 看，图应该在 **Recents** 里。
 
 ---
 
 ## 注意
 
-- **Mac 必须开着、`server.py` 必须在跑**，手机才能上传和导图。睡眠状态下不行。
-- **必须同一个 Wi-Fi**。`.local` 主机名靠 mDNS/Bonjour 解析，跨网段就找不到了。
-- **token 别泄露**：任何拿到你 token 的人都能在同一个 Wi-Fi 上访问你的 Mac 服务。
-  iCloud 同步快捷指令的话，token 也会同步到你其他设备。
-- **海报图字体**：海报里的中文要靠 Mac 上安装的字体渲染（默认找 PingFang 苹方），
-  没装的话中文会变成方块。Mac 自带的字体一般都够用。
+- **Mac 必须开着、`server.py` 必须在跑**，手机才能上传和导图。Mac 合盖睡眠就不行了
+  （System Settings → Battery 可设接电源不睡眠；或用 `caffeinate -i python server.py`
+  跑，运行期间阻止睡眠）。
+- **必须同一个 Wi-Fi**。`.local` 主机名靠 mDNS/Bonjour 解析；连不上时试内网 IP
+  （Mac 上 `ipconfig getifaddr en0` 查，形如 `http://192.168.86.36:8000`）。
+- macOS **Firewall** 如果开着会拦手机连入：System Settings → Network → Firewall，
+  关掉或允许 Python 入站。
+- **成品图中文字体**：靠 Mac 系统字体渲染（默认找苹方 PingFang），Mac 自带的就够。
+- 如果设了 token：拿到 token 的人在同一 Wi-Fi 就能访问这个服务；快捷指令经 iCloud
+  同步的话 token 也会跟着同步。
