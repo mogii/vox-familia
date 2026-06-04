@@ -1,104 +1,124 @@
-# 视频处理脚本（本地跑）
+# 宝宝闲置 — Mac 上的本地服务
 
-对着摄像头一件件介绍宝宝闲置，说「**下一件**」切换下一样。录完在自己电脑上跑一下脚本，
-它会自动：转文字 → 按「下一件」切段 → 每件挑几张最清楚的图 → 用 Claude 听出最终价格(美元)
-并写好标题和描述。你检查一下、删掉不要的图，再跑一下就发布到小程序。
+对着摄像头一件件介绍宝宝闲置，说「**下一件**」切下一样。手机分享视频到 Mac 上跑着
+的这个服务，它自动转写、切段、挑图、用 Claude 提价格写描述，然后你在 iPhone 浏览器
+里检查、改、勾图，导出到相册——之后随手发到微信群里就行。
 
-整套都在你电脑本地：语音转文字用本地 Whisper，**视频不会离开你的电脑**。只有每件那段
-口述文字会发给 Claude 整理价格和描述。
+所有处理都在你 Mac 本地：Whisper 跑在本地，**视频不离开你电脑**；只有每件那段口述
+文字会发给 Claude 整理价格和描述。
 
-## 装环境（一次性）
+## 一次性环境准备
+
+### 1. 装 Python 依赖
 
 ```bash
 cd processor
-python3 -m venv .venv && source .venv/bin/activate   # 可选，但推荐
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # 然后编辑 .env 填上你的 key 等
+cp .env.example .env        # 然后编辑 .env
 ```
 
-`requirements.txt` 里的 `imageio-ffmpeg` 自带 ffmpeg，不用单独装。第一次跑 Whisper 会
-自动下载模型（`small` 约几百 MB），之后就走本地缓存。
+`requirements.txt` 里的 `imageio-ffmpeg` 自带 ffmpeg；第一次跑 Whisper 会自动下载
+模型（`small` 约几百 MB）。
 
-`.env` 里要填：
+`.env` 必填：
 
-- `ANTHROPIC_API_KEY` — Claude 的 key（提价格 / 写描述用，费用很小）
-- `CONTACT` — 你的微信号，会写进每件商品的「联系卖家」
-- 发布时还要 `WX_APPID` / `WX_APPSECRET` / `WX_ENV_ID`（见下方「发布」）
+- `ANTHROPIC_API_KEY` — Claude 的 key（费用很小）
+- `CONTACT` — 你的微信号（写进每件商品）
+- `SERVER_TOKEN` — 随便填一个长字符串（手机端会带这个 token）
 
-## 第一步：处理视频
+### 2. 启动服务
+
+```bash
+python server.py
+```
+
+输出里会写明端口（默认 8000）。Mac 系统设置 →「共享 → 本地主机名」里能看到 Mac 的
+`.local` 地址，例如 `nicks-macbook.local`。验证一下：
+
+```
+http://nicks-macbook.local:8000/?t=<你的SERVER_TOKEN>
+```
+
+iPhone 浏览器打开这个地址（保持在前台），看到"还没有视频"就对了。把它加到主屏方便
+下次开。
+
+### 3. 在 iPhone 上建两个快捷指令
+
+见 [`shortcuts/README.md`](shortcuts/README.md)，两条都是几个动作的事，5 分钟搞定：
+
+- **处理闲置**：照片分享面板里的入口，把视频上传给 Mac。
+- **保存闲置图**：被网页按钮调起，把导出图存到相册。
+
+---
+
+## 日常用法
+
+1. **录视频**：iPhone 录像，一件件介绍，说「下一件」切下一样。可以临时改价（脚本会取你
+   **最后说定**的那个）。
+2. **触发处理**：照片里找到这条视频 → 分享 → 选「处理闲置」。手机会推一条通知"已上传"。
+3. **去看结果**：iPhone 浏览器里那个一直开着的页面下拉刷新（或等它自己刷新）。处理
+   完会看到一条条商品。
+4. **审一下**：每件可以改标题/价格/成色/描述；点缩略图勾上/取消想要的照片。
+5. **导出**：每件下面两个按钮——
+   - 「导出原图到相册」：把你勾的几张原图存进相册
+   - 「导出海报图」：合成一张"图+标题+价格+描述"的卡片图存进相册
+6. **发群**：相册里挑刚存进去的图，正常分享到微信群即可。
+
+---
+
+## 命令行备用
+
+不想用手机也行：
 
 ```bash
 python process.py 我的视频.mp4
 ```
 
-跑完会得到一个 `out/` 目录：
+会建一个新的 job，处理完后 `python server.py` 起来，浏览器打开 `/` 就能审。
+
+---
+
+## 暗号、模型、参数
+
+`.env` 里能调的：
+
+- `TRIGGERS=下一件,换一个` — 切段暗号（逗号分隔；默认四个）
+- `FRAMES_PER_ITEM=5` — 每件默认勾几张图（你可以在网页里增减）
+- `SAMPLE_FPS=2` — 抽帧采样频率（动作快可调高）
+- `WHISPER_MODEL=small` — 准/慢权衡（tiny / base / small / medium / large-v3）
+- `CLAUDE_MODEL=claude-sonnet-4-6` — 默认这个，价格低又够用
+
+---
+
+## 数据放哪儿
+
+所有处理结果在 `processor/jobs/<id>/`：
 
 ```
-out/
-├── transcript.txt        全部转写文字（参考用）
-├── listings.json         整理好的商品列表 ← 发布前在这里检查/修改
-├── item01/item01_1.jpg   第 1 件挑出来的图（不满意的直接删掉）
-├── item02/...
-└── ...
+jobs/abc1234567/
+├── 你的视频.mov         上传的原视频
+├── state.json          这个 job 的状态、各件商品的数据
+├── items/0/...jpg      第 1 件的所有候选帧
+├── items/1/...jpg      ...
+└── posters/0.jpg       第 1 件的海报图（按需生成、按需清除）
 ```
 
-常用参数：
+不需要的 job 直接 `rm -rf jobs/<id>` 删掉就行（页面会自动跳到下一个最近的）。
 
-- `--frames 6` 每件最多挑几张图（默认 5）
-- `--fps 3` 抽帧采样频率，动作快可调高（默认 2）
-- `--no-ai` 不调用 Claude，只切段+挑图，价格和描述留空，全部手填
+`.env` 和 `jobs/` 都在 `.gitignore` 里，不会进仓库。
 
-## 第二步：检查和修改
+---
 
-打开 `out/listings.json`，每件长这样：
+## 常见问题
 
-```json
-{
-  "title": "婴儿推车",
-  "price": 35,
-  "condition": "9成新",
-  "description": "用了大概半年，推起来很顺，折叠方便。",
-  "contact": "你的微信号",
-  "images": ["item01/item01_1.jpg", "item01/item01_3.jpg"],
-  "transcript": "（当时你说的原话，仅供参考）"
-}
-```
-
-- 价格不对就改 `price`（数字，美元）。**没听出价格的会是 `null`，必须先填上才会发布。**
-- 描述、标题、成色随便改。
-- 图不满意：直接去 `out/itemNN/` 删掉那张文件，或在 `images` 里删掉那一行。
-- 整件不想发：把这一段从数组里删掉即可。
-
-## 第三步：发布到小程序
-
-```bash
-python publish.py
-```
-
-它会把图片传到你的云开发存储、每件写一条到 `products` 集合。发完会给每件加上
-`"published": true`，再跑一次不会重复发；想重发就把这个标记删掉。
-
-打开小程序「逛闲置」就能看到，照常分享到微信群。
-
-### 发布需要的云开发配置
-
-`publish.py` 用微信云开发的服务端 HTTP 接口，只需要小程序的 AppID/AppSecret，不用
-腾讯云密钥。在 `.env` 里填：
-
-- `WX_APPID` / `WX_APPSECRET` — 在 [mp.weixin.qq.com](https://mp.weixin.qq.com) →
-  「开发管理 → 开发设置」里拿。
-- `WX_ENV_ID` — 云开发环境 ID。
-
-> 如果在「开发设置 → IP 白名单」里开了限制，要把你电脑的公网 IP 加进去，否则取不到
-> access_token。
-
-## 录视频的小建议
-
-- 一件东西讲完了再说「下一件」，停顿半秒更好切。
-- 价格说清楚；临时改主意也没关系，脚本会取你**最后说定**的价。
-- 想让图更好看：每件多换几个角度、光线亮一点，脚本会自动挑最清楚的。
-
-## 暗号可以改
-
-默认「下一件 / 下一个 / 下一样 / 下一款」都能切段。想自定义就在 `.env` 里设
-`TRIGGERS=下一件,换一个`（逗号分隔）。
+- **手机打不开 `nicks-macbook.local:8000`**：
+  - Mac 上 `server.py` 还在跑吗？
+  - 手机和 Mac 在同一个 Wi-Fi 吗？
+  - 浏览器试试 Mac 的内网 IP，例如 `http://192.168.1.42:8000/?t=...`。
+  - macOS 的「防火墙」如果开着，会拦住外部连入；要么关掉，要么允许 Python 入站。
+- **海报图里中文是方块**：Mac 上没找到 CJK 字体。`.env` 里 `POSTER_FONT` 指到一个
+  存在的字体文件（系统自带的 `/System/Library/Fonts/PingFang.ttc` 一般都在）。
+- **`No module named 'faster_whisper'`** 之类**：`pip install -r requirements.txt`
+  漏了，重装一下。
+- **AI 整理偶尔会乱**：每件下面有「当时说的原话」可以展开比对；不满意直接手动改。

@@ -1,5 +1,6 @@
 .env
 out/
+jobs/
 __pycache__/
 *.pyc
 .venv/
