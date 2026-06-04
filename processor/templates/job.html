@@ -31,7 +31,7 @@
       <p>还没有视频。手机上录一段，用「处理闲置」分享过来即可。</p>
       <p class="muted">这个页面会自动刷新；下拉也行。</p>
     </main>
-  {% elif active.stage in ('queued','transcribing','segmenting','extracting','enriching') %}
+  {% elif active.stage in ('queued','transcribing','segmenting','extracting','enriching','searching') %}
     <main class="processing">
       <div class="spinner"></div>
       <div class="msg">{{ active.message or '处理中...' }}</div>
@@ -78,6 +78,17 @@
             </label>
           </div>
 
+          <label>原价（新品参考，可空；印在成品图上带删除线）
+            <input data-field="marketPriceText" value="{{ L.marketPriceText or '' }}"
+                   placeholder="如 $169.99 或 $40–60">
+          </label>
+          {% if L.marketSearched and not L.marketPriceText %}
+            <p class="muted small market-note">「查原价」搜过了，但没找到可靠价格；需要可手填。</p>
+          {% endif %}
+          {% if L.marketSource %}
+            <p class="muted small market-note">参考来源：<a href="{{ L.marketSource }}" target="_blank" rel="noopener">{{ L.marketSource }}</a></p>
+          {% endif %}
+
           <label>描述
             <textarea data-field="description" rows="3" placeholder="买家看到的描述">{{ L.description or '' }}</textarea>
           </label>
@@ -91,11 +102,16 @@
             {% for c in L.candidates %}
               {% set k = loop.index0 %}
               {% set is_sel = k in L.selected %}
-              <button class="thumb {% if is_sel %}sel{% endif %}" data-idx="{{ k }}" type="button">
-                <img loading="lazy"
-                     data-src="/jobs/{{ active.id }}/items/{{ n }}/{{ c.filename }}{{ qs }}">
-                <span class="pick">{% if is_sel %}✓{% endif %}</span>
-              </button>
+              <div class="thumb {% if is_sel %}sel{% endif %}" data-idx="{{ k }}">
+                <button class="shot" type="button">
+                  <img loading="lazy"
+                       data-src="/jobs/{{ active.id }}/items/{{ n }}/{{ c.filename }}{{ qs }}">
+                  <span class="pick">{% if is_sel %}✓{% endif %}</span>
+                </button>
+                <input class="cap" type="text" data-capidx="{{ k }}"
+                       placeholder="这张的配文（可空）"
+                       value="{{ (L.captions or {}).get(k|string, '') }}">
+              </div>
             {% endfor %}
           </div>
 
@@ -106,11 +122,11 @@
             </a>
             <a class="btn alt shortcut-link" href="#"
                data-target="/jobs/{{ active.id }}/listings/{{ n }}/export.json?kind=poster{{ amp_t }}">
-              导出海报图
+              导出成品长图
             </a>
             <a class="btn ghost" target="_blank"
                href="/jobs/{{ active.id }}/posters/{{ n }}.jpg{{ qs }}">
-              预览海报
+              预览长图
             </a>
           </div>
         </section>
@@ -169,14 +185,31 @@
         el.addEventListener('change', () => debouncedPatch(el, n, field, el.value));
       });
 
-      section.querySelectorAll('.thumb').forEach(btn => {
+      section.querySelectorAll('.thumb .shot').forEach(btn => {
         btn.addEventListener('click', () => {
-          btn.classList.toggle('sel');
-          btn.querySelector('.pick').textContent = btn.classList.contains('sel') ? '✓' : '';
+          const cell = btn.closest('.thumb');
+          cell.classList.toggle('sel');
+          btn.querySelector('.pick').textContent = cell.classList.contains('sel') ? '✓' : '';
           const sel = [...section.querySelectorAll('.thumb.sel')]
             .map(b => Number(b.dataset.idx))
             .sort((a, b) => a - b);
           postPatch(n, { selected: sel });
+        });
+      });
+
+      // Per-photo captions: collect all non-empty ones into {index: text}.
+      function collectCaps() {
+        const caps = {};
+        section.querySelectorAll('.cap').forEach(inp => {
+          const v = inp.value.trim();
+          if (v) caps[inp.dataset.capidx] = v;
+        });
+        return caps;
+      }
+      section.querySelectorAll('.cap').forEach(inp => {
+        inp.addEventListener('input', () => {
+          clearTimeout(timers.get(inp));
+          timers.set(inp, setTimeout(() => postPatch(n, { captions: collectCaps() }), 400));
         });
       });
     });
@@ -195,7 +228,7 @@
           return;
         }
         if (!jobId && s.active) {
-          const settled = !['queued','transcribing','segmenting','extracting','enriching'].includes(stage);
+          const settled = !['queued','transcribing','segmenting','extracting','enriching','searching'].includes(stage);
           if (settled) { location.reload(); return; }
           const msg = document.querySelector('.processing .msg');
           const prog = document.querySelector('.processing .muted:not(.small)');

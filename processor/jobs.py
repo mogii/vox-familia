@@ -98,12 +98,14 @@ def current_active():
     """Pick the job to show on the home page.
 
     Precedence:
-      1. An in-progress job (queued / transcribing / segmenting / extracting / enriching)
+      1. An in-progress job (queued / transcribing / segmenting / extracting
+         / enriching / searching)
       2. The most recently completed job
       3. None (nothing to show)
     """
     jobs = list_jobs()
-    active_stages = {"queued", "transcribing", "segmenting", "extracting", "enriching"}
+    active_stages = {"queued", "transcribing", "segmenting", "extracting",
+                     "enriching", "searching"}
     for j in jobs:
         if j.get("stage") in active_stages:
             return j, [k for k in jobs if k["id"] != j["id"]]

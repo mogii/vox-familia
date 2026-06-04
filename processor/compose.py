@@ -1,21 +1,23 @@
 """Compose one listing's chosen photos into a single tall image for WeChat.
 
-Layout (chosen design): photos stacked top-to-bottom into one image.
-- Under the FIRST photo: a white info card (title / price / 原价 / description).
-- Under EVERY chosen photo (incl. the first): an optional caption the seller
-  typed for that specific photo.
+Layout: selected photos stacked top-to-bottom into ONE image.
+- Under the FIRST photo: a white info card (title / price / ~~原价~~ / condition
+  / description).
+- Under EVERY photo: the optional one-line caption the seller typed for it.
 
-Pure Pillow, uses a macOS CJK font. Self-test at the bottom builds a synthetic
-listing so you can eyeball the result without running a whole video.
+Works off the job data model: listing["candidates"] (all frames),
+listing["selected"] (indices), listing["captions"] ({index-as-str: text}).
 """
 
 import os
 
 from PIL import Image, ImageDraw, ImageFont
 
+import config
+
 WIDTH = 1080          # WeChat-friendly width
 SIDE = 48             # left/right padding inside cards
-GAP = 16             # vertical gap between stacked blocks
+GAP = 16              # vertical gap between stacked blocks
 BG = (245, 246, 248)  # canvas background
 CARD_BG = (255, 255, 255)
 INK = (34, 34, 34)
@@ -23,23 +25,23 @@ GREY = (140, 140, 140)
 ORANGE = (255, 90, 44)
 TAG_BG = (241, 241, 241)
 
-# macOS CJK fonts, tried in order. Index picks a face inside a .ttc.
-FONT_CANDIDATES = [
-    ("/System/Library/Fonts/PingFang.ttc", 0),
-    ("/System/Library/Fonts/Hiragino Sans GB.ttc", 0),
-    ("/System/Library/Fonts/STHeiti Medium.ttc", 0),
-    ("/Library/Fonts/Arial Unicode.ttf", 0),
-]
+_FONT_CACHE = {}
 
 
 def _font(size):
-    for path, idx in FONT_CANDIDATES:
-        if os.path.isfile(path):
+    if size in _FONT_CACHE:
+        return _FONT_CACHE[size]
+    for path in config.POSTER_FONT.split(":"):
+        if path and os.path.isfile(path):
             try:
-                return ImageFont.truetype(path, size, index=idx)
+                f = ImageFont.truetype(path, size)
+                _FONT_CACHE[size] = f
+                return f
             except Exception:
                 continue
-    return ImageFont.load_default()
+    f = ImageFont.load_default()
+    _FONT_CACHE[size] = f
+    return f
 
 
 def _wrap(draw, text, font, max_width):
@@ -91,7 +93,16 @@ def _caption_block(text):
     return block
 
 
-def _info_card(listing):
+def _num(v):
+    """Render a price without a trailing .0 (35.0 -> 35, 12.5 -> 12.5)."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return v
+    return int(f) if f == int(f) else round(f, 2)
+
+
+def _info_card(listing, currency):
     """The main white card: title, price + 原价, condition tag, description."""
     title_f = _font(46)
     price_f = _font(60)
@@ -125,12 +136,12 @@ def _info_card(listing):
 
     # Price line: big orange price, then struck-through 原价, then condition tag.
     price = listing.get("price")
-    price_text = f"${_num(price)}" if price is not None else "$—"
+    price_text = f"{currency}{_num(price)}" if price is not None else f"{currency}—"
     d.text((SIDE, y), price_text, font=price_f, fill=ORANGE)
     x = SIDE + d.textlength(price_text, font=price_f) + 24
 
-    market = listing.get("marketPriceText") or (
-        f"${_num(listing['marketPrice'])}" if listing.get("marketPrice") else None
+    market = (listing.get("marketPriceText") or "").strip() or (
+        f"{currency}{_num(listing['marketPrice'])}" if listing.get("marketPrice") else None
     )
     if market:
         label = f"原价 {market}"
@@ -160,15 +171,6 @@ def _info_card(listing):
     return card
 
 
-def _num(v):
-    """Render a price without a trailing .0 (35.0 -> 35, 12.5 -> 12.5)."""
-    try:
-        f = float(v)
-    except (TypeError, ValueError):
-        return v
-    return int(f) if f == int(f) else round(f, 2)
-
-
 def _stack(blocks):
     blocks = [b for b in blocks if b is not None]
     total = sum(b.height for b in blocks) + GAP * (len(blocks) + 1)
@@ -180,49 +182,31 @@ def _stack(blocks):
     return canvas
 
 
-def compose_listing(listing, base_dir, out_path):
-    """Build the single composite image for one listing; save to out_path.
+def compose(item_dir, listing, currency="$"):
+    """Build the composite for one listing; return a Pillow Image.
 
-    Uses listing["selectedImages"] (ordered subset) if present, else all
-    listing["images"]. Per-photo notes come from listing["imageCaptions"].
+    Photos = listing["selected"] indices into listing["candidates"], in time
+    order. Per-photo captions come from listing["captions"][str(index)].
     """
-    images = listing.get("selectedImages") or listing.get("images") or []
-    captions = listing.get("imageCaptions") or {}
-    if not images:
-        raise ValueError("这件没有可用图片")
+    candidates = listing.get("candidates") or []
+    selected = [i for i in (listing.get("selected") or []) if 0 <= i < len(candidates)]
+    if not selected:
+        raise ValueError("请先选至少一张图")
+    captions = listing.get("captions") or {}
 
     blocks = []
-    for idx, rel in enumerate(images):
-        photo = _fit_photo(os.path.join(base_dir, rel))
-        blocks.append(photo)
-        if idx == 0:
-            blocks.append(_info_card(listing))
-        blocks.append(_caption_block(captions.get(rel)))
+    for pos, idx in enumerate(selected):
+        photo_path = os.path.join(item_dir, candidates[idx]["filename"])
+        blocks.append(_fit_photo(photo_path))
+        if pos == 0:
+            blocks.append(_info_card(listing, currency))
+        blocks.append(_caption_block(captions.get(str(idx))))
 
-    canvas = _stack(blocks)
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    canvas.save(out_path, quality=90)
-    return out_path
+    return _stack(blocks)
 
 
-if __name__ == "__main__":
-    # Self-test: synthesize two photos + a listing, compose, and report size.
-    import tempfile
-
-    tmp = tempfile.mkdtemp()
-    for name, color in [("a.jpg", (120, 170, 210)), ("b.jpg", (210, 170, 120))]:
-        Image.new("RGB", (1200, 900), color).save(os.path.join(tmp, name))
-
-    demo = {
-        "title": "Angel Bliss 婴儿床边睡篮",
-        "price": 35,
-        "condition": "9成新",
-        "description": "2019 款，用过几个月，结构很稳，可调高度。\n无破损，烟酒宠物 free 家庭。",
-        "marketPriceText": "$169.99–$199.99",
-        "marketPrice": 184.99,
-        "selectedImages": ["a.jpg", "b.jpg"],
-        "imageCaptions": {"b.jpg": "侧面：高度调节卡扣完好"},
-    }
-    out = compose_listing(demo, tmp, os.path.join(tmp, "post.jpg"))
-    im = Image.open(out)
-    print(f"composed OK -> {out}  size={im.size}")
+def render_to(path, item_dir, listing, currency="$"):
+    img = compose(item_dir, listing, currency=currency)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    img.save(path, "JPEG", quality=90)
+    return path

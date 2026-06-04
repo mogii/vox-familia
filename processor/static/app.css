@@ -54,11 +54,15 @@ details.muted summary { cursor: pointer; }
 
 .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
 .thumb {
-  position: relative; aspect-ratio: 1 / 1; padding: 0; border: 3px solid transparent;
-  border-radius: 10px; overflow: hidden; background: #eee; cursor: pointer;
+  border: 3px solid transparent; border-radius: 10px; overflow: hidden;
+  background: #fafafa;
 }
-.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb.sel { border-color: #ff7a45; }
+.thumb .shot {
+  position: relative; display: block; width: 100%; aspect-ratio: 1 / 1;
+  padding: 0; border: none; background: #eee; cursor: pointer;
+}
+.thumb .shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .thumb .pick {
   position: absolute; top: 6px; right: 6px;
   width: 24px; height: 24px; border-radius: 50%;
@@ -67,6 +71,15 @@ details.muted summary { cursor: pointer; }
   display: block;
 }
 .thumb:not(.sel) .pick { background: rgba(0,0,0,0.35); }
+/* 配文输入框：只有勾中的图才显示 */
+.thumb .cap {
+  display: none; width: 100%; border: none; border-top: 1px solid #eee;
+  padding: 7px 8px; font-size: 12px; background: #fff; font-family: inherit;
+}
+.thumb.sel .cap { display: block; }
+
+.market-note { margin: -6px 0 12px; word-break: break-all; }
+.market-note a { color: #2c7be5; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .btn {

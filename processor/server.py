@@ -28,10 +28,10 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+import compose
 import config
 import jobs
 import pipeline
-import poster
 
 app = FastAPI(title="vox-familia")
 
@@ -176,7 +176,8 @@ async def patch_listing(
     listings = state.get("listings", [])
     if not (0 <= n < len(listings)):
         raise HTTPException(404, "no such listing")
-    allowed = {"title", "price", "condition", "description", "contact", "selected"}
+    allowed = {"title", "price", "condition", "description", "contact", "selected",
+               "captions", "marketPrice", "marketPriceText", "marketSource"}
     for k, v in body.items():
         if k in allowed:
             listings[n][k] = v
@@ -213,13 +214,15 @@ async def serve_poster(job_id: str, n: int, _: None = Depends(_check_token)):
     listing = listings[n]
     if not listing.get("selected"):
         raise HTTPException(400, "请先选一张图")
-    first_idx = listing["selected"][0]
-    cand = listing["candidates"][first_idx]
-    photo_path = os.path.join(jobs.job_dir(job_id), "items", str(n), cand["filename"])
+    item_dir = os.path.join(jobs.job_dir(job_id), "items", str(n))
 
     out_path = os.path.join(jobs.job_dir(job_id), "posters", f"{n}.jpg")
     if not os.path.isfile(out_path):
-        poster.render_to(out_path, photo_path, listing, currency=config.CURRENCY_SYMBOL)
+        try:
+            compose.render_to(out_path, item_dir, listing,
+                              currency=config.CURRENCY_SYMBOL)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
     return FileResponse(out_path, media_type="image/jpeg")
 
 

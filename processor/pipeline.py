@@ -9,6 +9,7 @@ import os
 
 import config
 import frames
+import marketprice
 from enrich import enrich
 from segment import find_items
 from transcribe import transcribe
@@ -49,7 +50,10 @@ def run(job_dir, video_path, save_state, frames_per_item=None, sample_fps=None):
     if config.ANTHROPIC_API_KEY:
         import anthropic
 
-        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+        kwargs = {"api_key": config.ANTHROPIC_API_KEY}
+        if config.LLM_BASE_URL:  # Moonshot/Kimi 等 Anthropic 兼容端点
+            kwargs["base_url"] = config.LLM_BASE_URL
+        client = anthropic.Anthropic(**kwargs)
 
     for i, item in enumerate(items):
         save_state({"stage": "enriching",
@@ -74,6 +78,29 @@ def run(job_dir, video_path, save_state, frames_per_item=None, sample_fps=None):
         )
         save_state({"listings": listings})
 
+    # 说了「查原价」的那几件才联网搜新品参考价。
+    lookups = [i for i, item in enumerate(items)
+               if marketprice.wants_lookup(item["text"])]
+    for k, i in enumerate(lookups):
+        save_state({"stage": "searching",
+                    "message": f"联网查原价 {k + 1}/{len(lookups)}...",
+                    "progress": {"done": k, "total": len(lookups)}})
+        try:
+            market = marketprice.lookup(items[i]["text"])
+        except Exception:
+            # 搜索失败也算「搜过」，区分「搜了没到」和「压根没搜」。
+            market = {"searched": True, "price": None,
+                      "price_text": None, "source": None}
+        listings[i].update(
+            {
+                "marketSearched": market["searched"],
+                "marketPrice": market["price"],
+                "marketPriceText": market["price_text"],
+                "marketSource": market["source"],
+            }
+        )
+        save_state({"listings": listings})
+
     save_state({"stage": "done", "message": "处理完成", "listings": listings,
                 "progress": {"done": len(items), "total": len(items)}})
 
@@ -88,6 +115,11 @@ def _blank_listing(item):
         "transcript": item["text"],
         "start": item["start"],
         "end": item["end"],
-        "candidates": [],   # filled after frame extraction
-        "selected": [],     # indices into candidates
+        "candidates": [],        # filled after frame extraction
+        "selected": [],          # indices into candidates
+        "captions": {},          # {candidate index (str): one-line note}
+        "marketSearched": False,  # 「查原价」有没有搜过
+        "marketPrice": None,
+        "marketPriceText": None,
+        "marketSource": None,
     }
