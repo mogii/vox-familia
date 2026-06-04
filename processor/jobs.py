@@ -9,11 +9,16 @@ Each job is a directory under JOBS_DIR/<id>/ containing:
 
 import json
 import os
+import re
 import threading
 import time
 import uuid
 
 import config
+
+# new_id() 只产 10 位十六进制；所有按 id 找路径的地方都强制校验，
+# 防止把 ".."、绝对路径之类拼进文件系统路径（纵深防御）。
+_ID_RE = re.compile(r"[0-9a-f]{10}\Z")
 
 _LOCK = threading.Lock()
 
@@ -28,6 +33,8 @@ def new_id():
 
 
 def job_dir(job_id):
+    if not _ID_RE.fullmatch(str(job_id)):
+        raise ValueError("bad job id")
     return os.path.join(_root(), job_id)
 
 
@@ -87,6 +94,8 @@ def list_jobs():
         return []
     out = []
     for name in os.listdir(root):
+        if not _ID_RE.fullmatch(name):  # 跳过 .DS_Store 之类的杂项
+            continue
         st = read_state(name)
         if st and "created_at" in st:
             out.append(st)

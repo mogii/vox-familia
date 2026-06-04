@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <!-- 页面 URL 带 ?t=<token>，绝不能通过 Referer 头带去外站（如「参考来源」链接） -->
+  <meta name="referrer" content="no-referrer">
   <title>宝宝闲置</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
@@ -86,7 +88,7 @@
             <p class="muted small market-note">「查原价」搜过了，但没找到可靠价格；需要可手填。</p>
           {% endif %}
           {% if L.marketSource %}
-            <p class="muted small market-note">参考来源：<a href="{{ L.marketSource }}" target="_blank" rel="noopener">{{ L.marketSource }}</a></p>
+            <p class="muted small market-note">参考来源：<a href="{{ L.marketSource }}" target="_blank" rel="noopener noreferrer">{{ L.marketSource }}</a></p>
           {% endif %}
 
           <label>描述

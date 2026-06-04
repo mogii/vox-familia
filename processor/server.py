@@ -41,6 +41,10 @@ app.mount("/static", StaticFiles(directory=os.path.join(ROOT, "static")), name="
 
 WORKER_LOCK = asyncio.Lock()
 
+# job id 只可能是 jobs.new_id() 产的 10 位十六进制；在路由层就把
+# 不合法的拦掉（404/422），防止拼出 jobs/ 目录以外的路径。
+JOB_ID = Path(pattern=r"^[0-9a-f]{10}$")
+
 
 # ---------- auth ----------
 
@@ -97,7 +101,7 @@ async def home(request: Request, _: None = Depends(_check_token)):
 
 
 @app.get("/j/{job_id}", response_class=HTMLResponse)
-async def view_job(request: Request, job_id: str, _: None = Depends(_check_token)):
+async def view_job(request: Request, job_id: str = JOB_ID, _: None = Depends(_check_token)):
     """Look at a specific (older) job, e.g. from the history list."""
     state = jobs.read_state(job_id)
     if not state:
@@ -159,7 +163,7 @@ async def status_json(_: None = Depends(_check_token)):
 
 
 @app.get("/api/jobs/{job_id}")
-async def get_job(job_id: str, _: None = Depends(_check_token)):
+async def get_job(job_id: str = JOB_ID, _: None = Depends(_check_token)):
     state = jobs.read_state(job_id)
     if not state:
         raise HTTPException(404, "no such job")
@@ -168,7 +172,7 @@ async def get_job(job_id: str, _: None = Depends(_check_token)):
 
 @app.patch("/api/jobs/{job_id}/listings/{n}")
 async def patch_listing(
-    job_id: str, n: int, body: dict, _: None = Depends(_check_token),
+    job_id: str = JOB_ID, n: int = Path(), body: dict = None, _: None = Depends(_check_token),
 ):
     state = jobs.read_state(job_id)
     if not state:
@@ -178,7 +182,7 @@ async def patch_listing(
         raise HTTPException(404, "no such listing")
     allowed = {"title", "price", "condition", "description", "contact", "selected",
                "captions", "marketPrice", "marketPriceText", "marketSource"}
-    for k, v in body.items():
+    for k, v in (body or {}).items():
         if k in allowed:
             listings[n][k] = v
     # Invalidate any cached poster for this listing.
@@ -193,18 +197,20 @@ async def patch_listing(
 
 @app.get("/jobs/{job_id}/items/{n}/{filename}")
 async def serve_frame(
-    job_id: str, n: int, filename: str, _: None = Depends(_check_token),
+    job_id: str = JOB_ID, n: int = Path(), filename: str = Path(), _: None = Depends(_check_token),
 ):
     if "/" in filename or filename.startswith("."):
         raise HTTPException(400, "bad filename")
-    path = os.path.join(jobs.job_dir(job_id), "items", str(n), filename)
-    if not os.path.isfile(path):
+    base = os.path.realpath(os.path.join(jobs.job_dir(job_id), "items", str(n)))
+    path = os.path.realpath(os.path.join(base, filename))
+    # 圈地检查：解析符号链接后必须还在这个 item 目录里。
+    if not path.startswith(base + os.sep) or not os.path.isfile(path):
         raise HTTPException(404, "no such image")
     return FileResponse(path, media_type="image/jpeg")
 
 
 @app.get("/jobs/{job_id}/posters/{n}.jpg")
-async def serve_poster(job_id: str, n: int, _: None = Depends(_check_token)):
+async def serve_poster(job_id: str = JOB_ID, n: int = Path(), _: None = Depends(_check_token)):
     state = jobs.read_state(job_id)
     if not state:
         raise HTTPException(404, "no such job")
@@ -236,8 +242,8 @@ def _abs_url(request: Request, path: str) -> str:
 @app.get("/jobs/{job_id}/listings/{n}/export.json")
 async def export_json(
     request: Request,
-    job_id: str,
-    n: int,
+    job_id: str = JOB_ID,
+    n: int = Path(),
     kind: str = Query("originals", pattern="^(originals|poster)$"),
     _: None = Depends(_check_token),
 ):
@@ -277,4 +283,6 @@ if __name__ == "__main__":
         host=config.SERVER_HOST,
         port=config.SERVER_PORT,
         reload=False,
+        # 访问日志会把带 ?t=<token> 的 URL 打到终端/日志里，关掉。
+        access_log=False,
     )
