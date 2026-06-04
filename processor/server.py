@@ -239,6 +239,19 @@ def _abs_url(request: Request, path: str) -> str:
     return f"{base}{path}"
 
 
+def _listing_urls(request, job_id, n, listing, kind, qs):
+    """The image URLs the Save-to-Photos Shortcut should fetch for one listing."""
+    urls = []
+    if kind == "originals":
+        for idx in listing.get("selected", []):
+            if 0 <= idx < len(listing.get("candidates", [])):
+                f = listing["candidates"][idx]["filename"]
+                urls.append(_abs_url(request, f"/jobs/{job_id}/items/{n}/{f}{qs}"))
+    elif listing.get("selected"):  # 没勾图的件出不了长图，跳过
+        urls.append(_abs_url(request, f"/jobs/{job_id}/posters/{n}.jpg{qs}"))
+    return urls
+
+
 @app.get("/jobs/{job_id}/listings/{n}/export.json")
 async def export_json(
     request: Request,
@@ -253,18 +266,25 @@ async def export_json(
     listings = state.get("listings", [])
     if not (0 <= n < len(listings)):
         raise HTTPException(404, "no such listing")
-    listing = listings[n]
     qs = f"?t={config.SERVER_TOKEN}" if config.SERVER_TOKEN else ""
+    return JSONResponse(_listing_urls(request, job_id, n, listings[n], kind, qs))
 
+
+@app.get("/jobs/{job_id}/export.json")
+async def export_all_json(
+    request: Request,
+    job_id: str = JOB_ID,
+    kind: str = Query("originals", pattern="^(originals|poster)$"),
+    _: None = Depends(_check_token),
+):
+    """整个视频一次性导出：所有件的原图，或每件一张成品长图。"""
+    state = jobs.read_state(job_id)
+    if not state:
+        raise HTTPException(404, "no such job")
     urls = []
-    if kind == "originals":
-        for idx in listing.get("selected", []):
-            if 0 <= idx < len(listing.get("candidates", [])):
-                f = listing["candidates"][idx]["filename"]
-                urls.append(_abs_url(request, f"/jobs/{job_id}/items/{n}/{f}{qs}"))
-    else:
-        urls.append(_abs_url(request, f"/jobs/{job_id}/posters/{n}.jpg{qs}"))
-
+    qs = f"?t={config.SERVER_TOKEN}" if config.SERVER_TOKEN else ""
+    for n, listing in enumerate(state.get("listings", [])):
+        urls.extend(_listing_urls(request, job_id, n, listing, kind, qs))
     return JSONResponse(urls)
 
 

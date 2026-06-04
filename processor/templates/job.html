@@ -54,6 +54,18 @@
         <span>{{ active.listings|length }} 件</span>
       </div>
 
+      {% set amp_t_all = ('&t=' ~ token) if token else '' %}
+      <div class="actions batch">
+        <a class="btn shortcut-link" href="#"
+           data-target="/jobs/{{ active.id }}/export.json?kind=originals{{ amp_t_all }}">
+          导出全部原图
+        </a>
+        <a class="btn alt shortcut-link" href="#"
+           data-target="/jobs/{{ active.id }}/export.json?kind=poster{{ amp_t_all }}">
+          导出全部长图
+        </a>
+      </div>
+
       {% for L in active.listings %}
         {% set n = loop.index0 %}
         {% set qs = ('?t=' ~ token) if token else '' %}

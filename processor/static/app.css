@@ -82,6 +82,7 @@ details.muted summary { cursor: pointer; }
 .market-note a { color: #2c7be5; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.actions.batch { margin: 0 0 16px; }
 .btn {
   flex: 1; min-width: 140px; text-align: center;
   padding: 12px 14px; border-radius: 12px; font-size: 14px;
