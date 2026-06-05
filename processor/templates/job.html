@@ -10,7 +10,7 @@
 </head>
 <body>
   <header>
-    <div class="title">宝宝闲置</div>
+    <a class="title" href="/{% if token %}?t={{ token }}{% endif %}">宝宝闲置</a>
     {% if history %}
     <details class="history">
       <summary>最近</summary>

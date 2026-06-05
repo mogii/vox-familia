@@ -137,13 +137,14 @@ async def view_job(request: Request, job_id: str = JOB_ID, _: None = Depends(_ch
     state = jobs.read_state(job_id)
     if not state:
         raise HTTPException(404, "no such job")
-    _active, others = jobs.current_active()
+    # 「最近」= 除当前页之外的所有 job（包括最新的活跃 job，否则从旧页面回不去）。
+    others = [j for j in jobs.list_jobs() if j["id"] != job_id]
     return templates.TemplateResponse(
         request,
         "job.html",
         {
             "active": state,
-            "history": [j for j in others if j["id"] != job_id][:10],
+            "history": others[:10],
             "currency": config.CURRENCY_SYMBOL,
             "token": config.SERVER_TOKEN,
             "conditions": ["全新", "9成新", "8成新", "7成新及以下"],
