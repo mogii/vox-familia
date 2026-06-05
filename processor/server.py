@@ -9,6 +9,7 @@ or just:
 import asyncio
 import io
 import os
+import zipfile
 from typing import List, Optional
 
 from PIL import Image, ImageOps
@@ -136,49 +137,101 @@ async def view_job(request: Request, job_id: str = JOB_ID, _: None = Depends(_ch
 VIDEO_EXTS = {".mov", ".mp4", ".m4v", ".avi", ".mkv"}
 
 
+def _ext(name) -> str:
+    return os.path.splitext(name or "")[1].lower()
+
+
 def _is_video(f: UploadFile) -> bool:
-    ext = os.path.splitext(f.filename or "")[1].lower()
-    return ext in VIDEO_EXTS or (f.content_type or "").startswith("video/")
+    return _ext(f.filename) in VIDEO_EXTS or (f.content_type or "").startswith("video/")
+
+
+def _is_zip(f: UploadFile) -> bool:
+    return _ext(f.filename) == ".zip" or (f.content_type or "") in (
+        "application/zip", "application/x-zip-compressed",
+    )
+
+
+def _safe_name(name, fallback):
+    safe = "".join(c for c in (name or "") if c.isalnum() or c in ("-", "_", "."))
+    return safe or fallback
+
+
+def _start_video_job(name, write_chunks):
+    """Create a video job, stream the bytes in via write_chunks(fh), kick worker."""
+    safe = _safe_name(name, "video.mov")
+    job_id = jobs.create_job(safe)
+    target = os.path.join(jobs.job_dir(job_id), safe)
+    with open(target, "wb") as fh:
+        write_chunks(fh)
+    asyncio.create_task(_run_worker(job_id))
+    return {"ok": True, "id": job_id, "kind": "video"}
 
 
 @app.post("/upload")
 async def upload(
     request: Request, file: List[UploadFile], _: None = Depends(_check_token),
 ):
-    """同一个入口收视频或照片（快捷指令多选照片时是多个同名 file 字段）。
+    """同一个入口收视频或照片；也接受 zip（快捷指令的 Make Archive 产物）。
 
-    - 视频：照旧建 job 跑整条管线（多个文件里有视频就取第一个）。
-    - 照片：一次分享的几张算**一件商品**——直接生成一个处理完的 job，
-      照片全勾上，标题/价格/描述留空到网页里填。HEIC 转 JPEG、按 EXIF 摆正。
+    iOS 快捷指令的表单 File 字段对列表只会带第一项，所以多选照片要先
+    Make Archive 打成一个 zip 再传。服务端解包：
+    - zip 里有视频 → 取第一个跑整条管线；
+    - zip 里是照片（或散传的照片）→ 一次分享算**一件商品**，照片全勾上，
+      字段留空到网页里填。HEIC 转 JPEG、按 EXIF 摆正。
     """
     if not file:
         raise HTTPException(400, "no file")
 
-    videos = [f for f in file if _is_video(f)]
-    if videos:
-        v = videos[0]
-        name = v.filename or "video.mov"
-        # Keep the original filename inside the job dir, but make sure it's safe.
-        safe = "".join(c for c in name if c.isalnum() or c in ("-", "_", ".")) or "video.mov"
-        job_id = jobs.create_job(safe)
-        target = os.path.join(jobs.job_dir(job_id), safe)
-        with open(target, "wb") as fh:
-            while True:
-                chunk = await v.read(1024 * 1024)
-                if not chunk:
-                    break
-                fh.write(chunk)
-        asyncio.create_task(_run_worker(job_id))
-        return {"ok": True, "id": job_id, "kind": "video"}
+    # 1) 散传的视频：照旧流式落盘（不整读进内存）。
+    for f in file:
+        if _is_video(f):
+            def _write(fh, src=f):
+                while True:
+                    chunk = src.file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    fh.write(chunk)
 
-    # --- 纯照片：一件商品，无需跑管线 ---
-    job_id = jobs.create_job(f"照片×{len(file)}")
+            return _start_video_job(f.filename or "video.mov", _write)
+
+    # 2) 收集图片字节；zip 展开（里面藏着视频就走视频流程）。
+    image_payloads = []
+    for f in file:
+        if _is_zip(f):
+            try:
+                zf = zipfile.ZipFile(f.file)  # UploadFile 落在临时文件上，可随机读
+            except zipfile.BadZipFile:
+                raise HTTPException(400, "zip 文件损坏")
+            names = [
+                n for n in zf.namelist()
+                if os.path.basename(n) and not os.path.basename(n).startswith(".")
+            ]
+            zvideos = [n for n in names if _ext(n) in VIDEO_EXTS]
+            if zvideos:
+                def _write(fh, zf=zf, member=zvideos[0]):
+                    with zf.open(member) as src:
+                        while True:
+                            chunk = src.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            fh.write(chunk)
+
+                return _start_video_job(os.path.basename(zvideos[0]), _write)
+            for n in names:
+                image_payloads.append(zf.read(n))
+        else:
+            image_payloads.append(await f.read())
+
+    if len(image_payloads) > 40:
+        raise HTTPException(400, f"一次最多 40 张（收到 {len(image_payloads)} 张）")
+
+    # 3) 纯照片：一件商品，无需跑管线。
+    job_id = jobs.create_job("照片")
     item_dir = os.path.join(jobs.job_dir(job_id), "items", "0")
     os.makedirs(item_dir, exist_ok=True)
 
     candidates = []
-    for i, f in enumerate(file):
-        data = await f.read()
+    for i, data in enumerate(image_payloads):
         try:
             img = Image.open(io.BytesIO(data))
             img = ImageOps.exif_transpose(img).convert("RGB")
@@ -188,6 +241,7 @@ async def upload(
         img.save(os.path.join(item_dir, fn), "JPEG", quality=92)
         candidates.append({"filename": fn, "sharpness": 0})
 
+    jobs.patch_state(job_id, {"video_filename": f"照片×{len(candidates)}"})
     if not candidates:
         jobs.patch_state(job_id, {"stage": "error", "message": "没有能读取的图片"})
         raise HTTPException(400, "没有能读取的图片")

@@ -36,16 +36,20 @@ Shortcuts App → **+** 新建，名字随意（出现在分享面板里，建�
 
 ### 动作（按顺序添加，搜英文名）
 
-1. 顶部会自动有 **Receive [Media] input from [Share Sheet]**
-2. 添加 **Get Contents of URL**（获取 URL 的内容），点开箭头展开选项：
+1. 顶部会自动有 **Receive [Images and Media] input from [Share Sheet]**
+2. 添加 **Make Archive**（制作归档）：
+   - 输入自动是 **Shortcut Input**；**Format** 选 **Zip**
+   - 这一步是为了**多选照片**也能一次传全——iOS 的表单字段对多个文件只会带
+     第一个，打成一个 zip 就没这个问题；只选一张或传视频时照样工作（服务端会解包）
+3. 添加 **Get Contents of URL**（获取 URL 的内容），点开箭头展开选项：
    - **URL**：`http://morrys-macbook-air.local:8000/upload`
    - **Method**：**POST**
    - **Request Body**：**Form**（表单）
      - **Add new field** → 类型选 **File**：Key 填 `file`，Value 点一下选变量
-       **Shortcut Input**（快捷指令输入）
+       **Archive**（上一步 Make Archive 的输出）
    - （只有设了 SERVER_TOKEN 才要）**Headers** → **Add new header**：
      Key `Authorization`，Value `Bearer 你的SERVER_TOKEN`
-3. （可选）添加 **Show Notification**（显示通知）：内容写 `已上传，去网页等结果`
+4. （可选）添加 **Show Notification**（显示通知）：内容写 `已上传，去网页等结果`
 
 保存即可。用法：Photos 选视频（或多选几张同一件商品的照片）→ **Share** →
 往下划找到这条捷径 → 点一下。
