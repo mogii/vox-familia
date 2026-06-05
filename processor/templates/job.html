@@ -55,6 +55,7 @@
       </div>
 
       {% set amp_t_all = ('&t=' ~ token) if token else '' %}
+      {% set is_photos = active.source == 'photos' or (active.video_filename or '').startswith('照片') %}
       <div class="actions batch">
         <a class="btn shortcut-link" href="#"
            data-target="/jobs/{{ active.id }}/export.json?kind=originals{{ amp_t_all }}">
@@ -64,6 +65,11 @@
            data-target="/jobs/{{ active.id }}/export.json?kind=poster{{ amp_t_all }}">
           导出全部长图
         </a>
+        {% if is_photos and active.listings|length == 1 and active.listings[0].candidates|length > 1 %}
+          <button class="btn ghost" id="btn-split" type="button">拆成每张一件</button>
+        {% elif is_photos and active.listings|length > 1 %}
+          <button class="btn ghost" id="btn-merge" type="button">并成一件</button>
+        {% endif %}
       </div>
 
       {% for L in active.listings %}
@@ -227,6 +233,20 @@
         });
       });
     });
+
+    // 照片 job 的拆/并：服务端重排 listings 后整页刷新。
+    const splitBtn = document.getElementById('btn-split');
+    const mergeBtn = document.getElementById('btn-merge');
+    async function restructure(action, confirmMsg) {
+      if (!confirm(confirmMsg)) return;
+      const r = await fetch('/api/jobs/' + jobId + '/' + action + tQs, { method: 'POST' });
+      if (r.ok) { location.reload(); }
+      else { alert((await r.json()).detail || '操作失败'); }
+    }
+    if (splitBtn) splitBtn.addEventListener('click', () =>
+      restructure('split', '把这些照片拆成每张一件商品？'));
+    if (mergeBtn) mergeBtn.addEventListener('click', () =>
+      restructure('merge', '把这些件合并回一件（只保留第一件填过的字）？'));
 
     // Poll: if the active job changes (e.g. a new upload finishes), reload.
     async function poll() {

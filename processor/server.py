@@ -9,6 +9,7 @@ or just:
 import asyncio
 import io
 import os
+import shutil
 import zipfile
 from typing import List, Optional
 
@@ -263,7 +264,7 @@ async def upload(request: Request, _: None = Depends(_check_token)):
         raise HTTPException(400, f"一次最多 40 张（收到 {len(image_payloads)} 张）")
 
     # 3) 纯照片：一件商品，无需跑管线。
-    job_id = jobs.create_job("照片")
+    job_id = jobs.create_job("照片", source="photos")
     item_dir = os.path.join(jobs.job_dir(job_id), "items", "0")
     os.makedirs(item_dir, exist_ok=True)
 
@@ -356,6 +357,125 @@ async def patch_listing(
         os.remove(p)
     jobs.patch_state(job_id, {"listings": listings})
     return {"ok": True}
+
+
+# ---------- 照片 job 的拆/并 ----------
+
+def _blank_photo_listing():
+    return {
+        "title": "", "price": None, "condition": None, "description": "",
+        "contact": config.CONTACT, "transcript": "",
+        "candidates": [], "selected": [], "captions": {},
+        "marketSearched": False, "marketPrice": None,
+        "marketPriceText": None, "marketSource": None,
+    }
+
+
+def _require_photo_job(job_id):
+    state = jobs.read_state(job_id)
+    if not state:
+        raise HTTPException(404, "no such job")
+    # 老照片 job 没有 source 字段，用名字兜底识别。
+    is_photos = state.get("source") == "photos" or str(
+        state.get("video_filename", "")
+    ).startswith("照片")
+    if not is_photos:
+        raise HTTPException(400, "只有照片 job 支持拆/并")
+    return state
+
+
+def _clear_posters(job_id):
+    pdir = os.path.join(jobs.job_dir(job_id), "posters")
+    if os.path.isdir(pdir):
+        shutil.rmtree(pdir)
+
+
+@app.post("/api/jobs/{job_id}/split")
+async def split_photos(job_id: str = JOB_ID, _: None = Depends(_check_token)):
+    """一件多图 → 每张图一件（卖的是不同东西时用）。"""
+    state = _require_photo_job(job_id)
+    listings = state.get("listings", [])
+    if len(listings) != 1:
+        raise HTTPException(400, "已经是拆开的状态")
+    src = listings[0]
+    cands = src.get("candidates", [])
+    if len(cands) < 2:
+        raise HTTPException(400, "只有一张图，没什么可拆")
+
+    jd = jobs.job_dir(job_id)
+    new_listings = []
+    for i, c in enumerate(cands):
+        d = os.path.join(jd, "items", str(i))
+        os.makedirs(d, exist_ok=True)
+        if i != 0:  # 第 0 张原地不动，其余各搬进自己的目录
+            shutil.move(
+                os.path.join(jd, "items", "0", c["filename"]),
+                os.path.join(d, c["filename"]),
+            )
+        L = _blank_photo_listing()
+        L["candidates"] = [{"filename": c["filename"], "sharpness": 0}]
+        L["selected"] = [0]
+        cap = (src.get("captions") or {}).get(str(i))
+        if cap:
+            L["captions"] = {"0": cap}
+        new_listings.append(L)
+
+    _clear_posters(job_id)
+    jobs.patch_state(job_id, {
+        "listings": new_listings,
+        "video_filename": f"照片×{len(new_listings)}（每张一件）",
+        "message": f"已拆成 {len(new_listings)} 件",
+    })
+    print(f"[job {job_id}] 拆成 {len(new_listings)} 件", flush=True)
+    return {"ok": True, "count": len(new_listings)}
+
+
+@app.post("/api/jobs/{job_id}/merge")
+async def merge_photos(job_id: str = JOB_ID, _: None = Depends(_check_token)):
+    """多件 → 并回一件多图（多角度拍同一件时用）。其余件填过的字会丢弃。"""
+    state = _require_photo_job(job_id)
+    listings = state.get("listings", [])
+    if len(listings) < 2:
+        raise HTTPException(400, "本来就是一件")
+
+    jd = jobs.job_dir(job_id)
+    dest = os.path.join(jd, "items", "0")
+    os.makedirs(dest, exist_ok=True)
+
+    merged = _blank_photo_listing()
+    # 保留第一件已填的字段，照片按原顺序归拢、统一重命名防撞名。
+    for k in ("title", "price", "condition", "description", "contact"):
+        merged[k] = listings[0].get(k) or merged[k]
+    # 两阶段搬运：先全部挪成临时名，再统一定名——避免重命名顺序互相覆盖。
+    staged = []  # (tmp_path, caption)
+    for n, L in enumerate(listings):
+        for ci, c in enumerate(L.get("candidates", [])):
+            old = os.path.join(jd, "items", str(n), c["filename"])
+            if not os.path.isfile(old):
+                continue
+            tmp = os.path.join(dest, f"_tmp_{len(staged):03d}.jpg")
+            shutil.move(old, tmp)
+            staged.append((tmp, (L.get("captions") or {}).get(str(ci))))
+    for idx, (tmp, cap) in enumerate(staged):
+        fn = f"photo_{idx + 1:03d}.jpg"
+        os.replace(tmp, os.path.join(dest, fn))
+        if cap:
+            merged["captions"][str(idx)] = cap
+        merged["candidates"].append({"filename": fn, "sharpness": 0})
+    for n in range(1, len(listings)):  # 清掉空出来的目录
+        d = os.path.join(jd, "items", str(n))
+        if os.path.isdir(d):
+            shutil.rmtree(d)
+    merged["selected"] = list(range(len(merged["candidates"])))
+
+    _clear_posters(job_id)
+    jobs.patch_state(job_id, {
+        "listings": [merged],
+        "video_filename": f"照片×{len(merged['candidates'])}",
+        "message": "已并成一件",
+    })
+    print(f"[job {job_id}] 并成一件（{len(merged['candidates'])} 张图）", flush=True)
+    return {"ok": True, "count": len(merged["candidates"])}
 
 
 # ---------- image serving ----------

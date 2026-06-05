@@ -69,7 +69,7 @@ def patch_state(job_id, patch):
         return state
 
 
-def create_job(video_filename):
+def create_job(video_filename, source="video"):
     job_id = new_id()
     os.makedirs(job_dir(job_id), exist_ok=True)
     write_state(
@@ -77,6 +77,7 @@ def create_job(video_filename):
         {
             "id": job_id,
             "video_filename": video_filename,
+            "source": source,  # "video" | "photos"，照片 job 才支持拆/并
             "stage": "queued",
             "message": "排队中...",
             "created_at": int(time.time()),
