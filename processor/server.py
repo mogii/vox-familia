@@ -189,9 +189,7 @@ def _start_video_job(name, write_chunks):
 
 
 @app.post("/upload")
-async def upload(
-    request: Request, file: List[UploadFile], _: None = Depends(_check_token),
-):
+async def upload(request: Request, _: None = Depends(_check_token)):
     """同一个入口收视频或照片；也接受 zip（快捷指令的 Make Archive 产物）。
 
     iOS 快捷指令的表单 File 字段对列表只会带第一项，所以多选照片要先
@@ -199,9 +197,27 @@ async def upload(
     - zip 里有视频 → 取第一个跑整条管线；
     - zip 里是照片（或散传的照片）→ 一次分享算**一件商品**，照片全勾上，
       字段留空到网页里填。HEIC 转 JPEG、按 EXIF 摆正。
+
+    表单手工解析：收下**任何字段名**下的文件部件（捷径里 key 打错也没事），
+    并把收到的每个部件打到终端，方便对着日志排查捷径配置。
     """
+    form = await request.form()
+    file: List[UploadFile] = []
+    notes = []
+    for key, val in form.multi_items():
+        if isinstance(val, str):
+            notes.append(f"{key}=文本({len(val)}字符)")
+        else:  # 文件部件，无论字段叫什么都收
+            file.append(val)
+            notes.append(f"{key}=文件({val.filename}, {val.content_type})")
+    print(f"[upload] 表单字段: {', '.join(notes) or '(空)'}", flush=True)
+
     if not file:
-        raise HTTPException(400, "no file")
+        raise HTTPException(
+            400,
+            "表单里没有文件——检查捷径 Get Contents of URL 里那个字段的类型"
+            "是不是选成了 File（不是 Text），值是不是 Make Archive 的输出。",
+        )
 
     # 1) 散传的视频：照旧流式落盘（不整读进内存）。
     for f in file:
