@@ -56,6 +56,21 @@ WORKER_LOCK = asyncio.Lock()
 # 不合法的拦掉（404/422），防止拼出 jobs/ 目录以外的路径。
 JOB_ID = Path(pattern=r"^[0-9a-f]{10}$")
 
+# 自己打访问日志：只打路径不打 query string（?t=<token> 不能进日志）。
+# uvicorn 自带的 access_log 已关。轮询和静态资源太吵，跳过。
+_QUIET_PATHS = ("/status.json", "/static", "/healthz")
+
+
+@app.middleware("http")
+async def _access_log(request: Request, call_next):
+    response = await call_next(request)
+    p = request.url.path
+    if not p.startswith(_QUIET_PATHS):
+        client = request.client.host if request.client else "?"
+        print(f"[req] {client}  {request.method} {p} -> {response.status_code}",
+              flush=True)
+    return response
+
 
 # ---------- auth ----------
 
@@ -81,14 +96,18 @@ async def _run_worker(job_id: str):
         if not st:
             return
         video_path = os.path.join(jobs.job_dir(job_id), st["video_filename"])
+
+        def save(patch):
+            # 阶段变化同时播报到终端，盯着 server 就能看到进展。
+            if "stage" in patch or "message" in patch:
+                print(f"[job {job_id}] {patch.get('stage', '')} {patch.get('message', '')}",
+                      flush=True)
+            jobs.patch_state(job_id, patch)
+
         try:
-            await asyncio.to_thread(
-                pipeline.run,
-                jobs.job_dir(job_id),
-                video_path,
-                lambda patch: jobs.patch_state(job_id, patch),
-            )
+            await asyncio.to_thread(pipeline.run, jobs.job_dir(job_id), video_path, save)
         except Exception as e:
+            print(f"[job {job_id}] 出错：{e}", flush=True)
             jobs.patch_state(job_id, {"stage": "error", "message": f"出错：{e}"})
 
 
@@ -163,6 +182,8 @@ def _start_video_job(name, write_chunks):
     target = os.path.join(jobs.job_dir(job_id), safe)
     with open(target, "wb") as fh:
         write_chunks(fh)
+    size_mb = os.path.getsize(target) / 1e6
+    print(f"[job {job_id}] 收到视频 {safe}（{size_mb:.1f} MB），开始处理", flush=True)
     asyncio.create_task(_run_worker(job_id))
     return {"ok": True, "id": job_id, "kind": "video"}
 
@@ -266,6 +287,7 @@ async def upload(
         "message": "照片已就绪",
         "listings": [listing],
     })
+    print(f"[job {job_id}] 收到照片 ×{len(candidates)}，已就绪", flush=True)
     return {"ok": True, "id": job_id, "kind": "photos", "count": len(candidates)}
 
 
