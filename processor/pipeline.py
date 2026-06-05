@@ -23,7 +23,13 @@ def run(job_dir, video_path, save_state, frames_per_item=None, sample_fps=None):
     sample_fps = sample_fps or config.SAMPLE_FPS
 
     save_state({"stage": "transcribing", "message": "在转写..."})
-    words, full_text = transcribe(video_path)
+    try:
+        words, full_text = transcribe(video_path)
+    except Exception as e:
+        # 比如收到的根本不是视频/音频损坏：给出能看懂的提示，而不是底层库的玄学报错。
+        raise RuntimeError(
+            f"读不出这个文件的音频——确认分享的是视频？（底层错误：{e}）"
+        ) from e
     save_state({"transcript": full_text})
 
     save_state({"stage": "segmenting", "message": "按『下一件』切段..."})
